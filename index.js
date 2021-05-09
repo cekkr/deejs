@@ -103,7 +103,9 @@ function writeCache(acc){
     composition.push(fileName);
     fs.writeFileSync(fileName, acc);
 
-    ejs.renderFile(fileName, {}, {}, function(err, str){    
+    var obj = {data:23};
+
+    ejs.renderFile(fileName, obj, {}, function(err, str){    
         if(err){
             var file = fs.readFileSync(fileName);
             var fileErr = ejsLint(file.toString());
