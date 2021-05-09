@@ -4,7 +4,8 @@
   "description": "Server based on EJS",
   "main": "index.js",
   "dependencies": {
-    "ejs": "^3.1.6"
+    "ejs": "^3.1.6",
+    "ejs-lint": "^1.2.0"
   },
   "devDependencies": {},
   "scripts": {
