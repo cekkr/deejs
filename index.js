@@ -96,14 +96,14 @@ function calculateRelativePos(from, to){
     return (dir + path.basename(to)).replace('//','/');
 }
 
+var obj = {data:23};
+
 var breaks = 0;
 function writeCache(acc){
     var name = path.basename(__dirname)+'_'+breaks++;
     var fileName = 'cache/'+name+".ejs";
     composition.push(fileName);
     fs.writeFileSync(fileName, acc);
-
-    var obj = {data:23};
 
     ejs.renderFile(fileName, obj, {}, function(err, str){    
         if(err){
