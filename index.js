@@ -9,8 +9,6 @@ const options = {
   cert: fs.readFileSync('certificate.crt')
 };
 
-let _req, _res;
-
 console.log(process.cwd());
 
 var supportedFormats = ['ejs','html']
@@ -50,21 +48,23 @@ function searchPath(url){
     return {exists: fs.existsSync(url), file: url};
 }
 
-function include(file){
+/*function include(file){
     var res = fs.readFileSync(currentFile+file);
     _res.write(res);
     return res;
-}
+}*/
 
 var currentFile = 'htdocs/';
 
 https.createServer(options, (req, res) => {
-    _req = req;
-    _res = res;
+    var bag = {
+        req: req,
+        res: res
+    };
 
     //Analyze req.url
     var analyze = searchPath(req.url);
-    currentFile = path.dirname(analyze.file);
+    //currentFile = path.dirname(analyze.file);
     console.log(analyze);
 
     if(!analyze.exists){
@@ -74,7 +74,7 @@ https.createServer(options, (req, res) => {
     else {
         res.writeHead(200);
 
-        parser(analyze.file, true);
+        parser(bag, analyze.file, true);
 
         /**/
     }
@@ -82,9 +82,9 @@ https.createServer(options, (req, res) => {
 }).listen(8000);
 
 
-let people = function(){ return "test"; };
+/*let people = function(){ return "test"; };
 let html = ejs.render('<%= people(); %>', {people: people});
-console.log(html);
+console.log(html);*/
 
 var composition = [];
 
@@ -96,36 +96,24 @@ function calculateRelativePos(from, to){
     return (dir + path.basename(to)).replace('//','/');
 }
 
-var obj = {data:23};
+function parser(bag, filename, first=false){
+    if(first){
+        bag.breaks = 0;
+        bag.parserOrder = {};
+        bag.obj = {data:23};
+    }
 
-var breaks = 0;
-function writeCache(acc){
-    var name = path.basename(__dirname)+'_'+breaks++;
-    var fileName = 'cache/'+name+".ejs";
-    composition.push(fileName);
-    fs.writeFileSync(fileName, acc);
-
-    ejs.renderFile(fileName, obj, {}, function(err, str){    
-        if(err){
-            var file = fs.readFileSync(fileName);
-            var fileErr = ejsLint(file.toString());
-            console.error(fileErr);
-            _res.write(fileErr);
-        }
-        else {
-            _res.write(str);      
-        }
-    });
-}
-
-function parser(filename, first=false){
     var breaks = 0;
     var res = fs.readFileSync(filename);
     var acc = '';
-    var hasWrite = false;
 
-    var externals = ['<%', '{', '}', 'var', 'const', 'let'];
-    var internals = ['include','(',')', '%>',','];
+    var absPath = path.resolve(filename).replace('/','-').replace('\\','-');
+    parserOrder[absPath] = [];
+
+    var externals = ['<%', '{', '}',','];
+    var internals = ['include', 'out', '(',')', '%>',','];
+    var shared =    ['var', 'const', 'let']
+    var isInternal = false;
 
     var activators = internals;
     var isInTag = false;
@@ -135,14 +123,54 @@ function parser(filename, first=false){
     var lastArg = -1;
     var args = [];
 
+    var varCtrl = undefined;
+    var vars = {};
+
     var j=0;
+
+    function write(str, register=false){
+        acc += str;
+        if(register) j += str.length;
+    }
+
+    function writeCache(){
+        var b = breaks++;
+        parserOrder[absPath].push(b);
+        var name = absPath+'_'+breaks++;
+        var fileName = 'cache/'+name+".ejs";
+        composition.push(fileName);
+        fs.writeFileSync(fileName, acc);
+    
+        ejs.renderFile(fileName, obj, {}, function(err, str){    
+            if(err){
+                var file = fs.readFileSync(fileName);
+                var fileErr = ejsLint(file.toString());
+                console.error(fileErr);
+                _res.write(fileErr);
+            }
+            else {
+                _res.write(str);      
+            }
+        });
+    }
+
     for(; j<res.length; j++){
         nch = res[j];
         var ch = String.fromCharCode(nch);
         acc += ch;
 
+        if(varCtrl) varCtrl.read(ch)
+
         var winner = -1;
         for(var act of activators){
+            checkActivator(act);
+        }
+
+        if(winner==-1) for(var act of shared){
+            checkActivator(act);
+        }
+
+        function checkActivator(act){
             for(var i=0; i<act.length; i++){
                 if(acc[(acc.length-act.length)+i] != act[i])
                     break;
@@ -153,21 +181,41 @@ function parser(filename, first=false){
         }
 
         switch(winner){
+            case 'var','let','const':
+                varCtrl = new VarController()
+                varCtrl.Type = winner;
+                varCtrl.Internal = isInternal;
+                break;
+
             case '<%':
                 isInTag = true;
                 var next = res[j+1];
                 isInNormalTag = next != ' ' 
                 activators = internals;
+                isInternal = true;
                 break;
             
             case '%>':
                 isInTag = false;
                 isInNormalTag = false;
                 activators = externals;
+                isInternal = false;
                 break;
+
+            case 'out':
+                isCalling = 'out';
 
             case 'include':
                 isCalling = 'include';
+                break;
+
+            case ',':
+                if(varCtrl){
+                    var type = varCtrl.Type;
+                    varCtrlFinish();
+                    varCtrl = new VarController();
+                    varCtrl.Type = type;
+                }
                 break;
 
             case '(':
@@ -180,23 +228,86 @@ function parser(filename, first=false){
             case ')':
                 if(isCalling == 'include'){
                     acc = acc.substr(0,acc.indexOf('include'));
-                    acc += "%>";
+                    write("%>", true);
 
                     writeCache(acc);
-                    hasWrite = true;
 
                     acc = "<%";
 
-                    parser(calculateRelativePos(filename, args[0]));
-                }    
+                    parser(bag, calculateRelativePos(filename, args[0]));
+                    isCalling = undefined;
+                } 
+            case ';','\n':  
+            
+                varCtrlFinish();
+            
+                if(isCalling){
+                    switch(isCalling){
+                        case 'out':
+                            if(isInTag) acc += '%>'
+                            var v = vars[args[0]];
+                            acc += v.Type +' '+ args[0];
+                            if(v.Value) acc += '='+v.Value;
+                            if(isInTag) acc += '<%'
+                            break;
+                    }
+                }
 
                 break;
         }
+
+        function varCtrlFinish(){
+            if(varCtrl){
+                varCtrl.finish();
+                vars[varCtrl.Name] = varCtrl;
+                varCtrl = undefined;
+            }
+        }
     }
 
-    if(hasWrite == false)
-        writeCache(acc);
+    writeCache(acc);
 
     if(first)
         _res.end();
+}
+
+class VarController{
+    
+    constructor() {
+        this.lastCh;
+        this.phase = 0;
+        this.word = '';
+        this.apex = undefined;
+
+        this.Type;
+        this.Name;
+        this.Value;
+    }
+
+    read(ch){
+        if(ch != this.lastCh){
+            switch(ch){
+                case ' ':
+                    if(this.phase==0) this.phase = 1;
+                    break;
+                case '=':
+                    this.Name = this.word;
+                    this.word = '';
+                    this.phase = 2;
+                    break;
+                case '"',"'":
+                    if(this.phase==2 && this.apex == ch){
+                        if(this.apex) this.apex = undefined;
+                        else this.apex = ch;
+                    }
+                default:
+                    this.word += ch;
+                    break;  
+            }
+        }
+    }
+
+    finish(){
+        this.Value = this.word;
+    }
 }
