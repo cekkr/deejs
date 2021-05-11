@@ -141,15 +141,15 @@ function parser(bag, filename, first=false){
         composition.push(fileName);
         fs.writeFileSync(fileName, acc);
     
-        ejs.renderFile(fileName, obj, {}, function(err, str){    
+        ejs.renderFile(fileName, bag.obj, {}, function(err, str){    
             if(err){
                 var file = fs.readFileSync(fileName);
                 var fileErr = ejsLint(file.toString());
                 console.error(fileErr);
-                _res.write(fileErr);
+                bag.res.write(fileErr);
             }
             else {
-                _res.write(str);      
+                bag.res.write(str);      
             }
         });
     }
@@ -268,7 +268,7 @@ function parser(bag, filename, first=false){
     writeCache(acc);
 
     if(first)
-        _res.end();
+        bag.res.end();
 }
 
 class VarController{
