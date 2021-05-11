@@ -86,8 +86,6 @@ https.createServer(options, (req, res) => {
 let html = ejs.render('<%= people(); %>', {people: people});
 console.log(html);*/
 
-var composition = [];
-
 function calculateRelativePos(from, to){
     if(to[0]=='"'||to[0]=="'") to = to.substr(1,to.length-2);
 
@@ -101,16 +99,22 @@ function parser(bag, filename, first=false){
         bag.breaks = 0;
         bag.parserOrder = {};
         bag.obj = {data:23};
+        bag.composition = [];
+        bag.filesProp = {};
     }
+
+    var breaks = 0;
 
     var res = fs.readFileSync(filename);
     var acc = '';
 
     var absPath = path.resolve(filename).replaceAll('/','-').replaceAll('\\','-').replaceAll(':','');
+    if(bag.filesProp[absPath] == undefined) bag.filesProp[absPath] = {line: 0, col: 0};
     bag.parserOrder[absPath] = [];
+    var counterInit = {line:bag.filesProp[absPath].line, col: bag.filesProp[absPath].col};
 
     var externals = ['<%', '{', '}',','];
-    var internals = ['include', 'out', '(',')', '%>',','];
+    var internals = ['include', 'out', '(',')', '%>',',','=',';'];
     var shared =    ['var', 'const', 'let']
     var isInternal = false;
 
@@ -132,21 +136,35 @@ function parser(bag, filename, first=false){
         if(!register) j += str.length;
     }
 
-    var breaks = 0;
     function writeCache(){
         var b = breaks++;
         bag.parserOrder[absPath].push(b);
-        var name = absPath+'_'+breaks++;
+        var name = absPath+'_'+b;
         var fileName = 'cache/'+name+".ejs";
-        composition.push(fileName);
+        bag.composition.push(fileName);
         fs.writeFileSync(fileName, acc);
-    
+
         ejs.renderFile(fileName, bag.obj, {}, function(err, str){    
             if(err){
                 var file = fs.readFileSync(fileName);
                 var fileErr = ejsLint(file.toString());
-                console.error(fileErr);
-                bag.res.write(fileErr);
+
+                if(err.message){
+                    var lines = err.message.split('\n');
+                    console.log(lines);
+                    err.message = "Error: " + lines[lines.length-1] + "\n";
+                    for(var i=1; i<lines.length-2; i++){
+                        var line = lines[i];
+                        var re = /([1-9]+)\|/g;
+                        var split = line.split(re);
+                        console.log(split);
+                        var init = split[0]; //if(init.indexOf('>')<0)init+=' ';
+                        err.message += init+(counterInit.line+parseInt(split[1]))+ '| ' +split[2];
+                    }
+                }
+
+                console.error(fileErr || err.message);
+                bag.res.write(fileErr || err.message);
             }
             else {
                 bag.res.write(str);      
@@ -158,6 +176,13 @@ function parser(bag, filename, first=false){
         nch = res[j];
         var ch = String.fromCharCode(nch);
         acc += ch;
+
+        if(ch == '\n'){ 
+            bag.filesProp[absPath].line++;
+            bag.filesProp[absPath].col = 0;
+        }
+        else 
+            bag.filesProp[absPath].col++;
 
         if(varCtrl) varCtrl.read(ch)
 
@@ -180,8 +205,28 @@ function parser(bag, filename, first=false){
             }
         }
 
+        function isLetter($word){
+            var patt = /[A-Z]|[a-z]|[0-9]/g
+            return patt.test($word);
+        }
+
+        function checkWord(before){
+            var word = '';
+            for(var i=acc.length-1-before; i>=0; i--){
+                if(isLetter(acc[i])){
+                    word = acc[i] + word;
+                }
+                else
+                    if(word.length>0) break;
+            }
+
+            return word;
+        }
+
         switch(winner){
-            case 'var','let','const':
+            case 'var':
+            case 'let':
+            case 'const':
                 varCtrl = new VarController()
                 varCtrl.Type = winner;
                 varCtrl.Internal = isInternal;
@@ -202,8 +247,21 @@ function parser(bag, filename, first=false){
                 isInternal = false;
                 break;
 
+            case '=':
+                var word = checkWord();
+                if(!varCtrl) {
+                    varCtrl = vars[word];
+                    if(!varCtrl) {
+                        //varCtrl = new VarController();
+                        //todo: error: variable not declared
+                    }
+                }
+                //else varCtrl.Name = word;
+                break;
+
             case 'out':
                 isCalling = 'out';
+                break;
 
             case 'include':
                 isCalling = 'include';
@@ -222,10 +280,15 @@ function parser(bag, filename, first=false){
                 lastArg = j;
                 break;
             
-            case ',',')':
+            case ',':
                 args.push(acc.substr(lastArg+1, j-lastArg-1));
                 lastArg = j;
+                break;
+
             case ')':
+                args.push(acc.substr(lastArg+1, j-lastArg-1));
+                lastArg = j;
+
                 if(isCalling == 'include'){
                     acc = acc.substr(0,acc.indexOf('include'));
                     write("%>", true);
@@ -234,10 +297,18 @@ function parser(bag, filename, first=false){
 
                     acc = "<%";
 
+                    for(var v in vars){
+                        bag.obj[vars[v].Name] = vars[v].Value;
+                    }
+
                     parser(bag, calculateRelativePos(filename, args[0]));
                     isCalling = undefined;
                 } 
-            case ';','\n':  
+
+                break;
+
+            case ';':
+            case '\n':  
             
                 varCtrlFinish();
             
@@ -254,11 +325,14 @@ function parser(bag, filename, first=false){
                 }
 
                 break;
+
+            case -1:
+
+                break;
         }
 
         function varCtrlFinish(){
             if(varCtrl){
-                varCtrl.finish();
                 vars[varCtrl.Name] = varCtrl;
                 varCtrl = undefined;
             }
@@ -285,7 +359,7 @@ class VarController{
     }
 
     read(ch){
-        if(ch != this.lastCh){
+        if(this.phase < 3 && ch != this.lastCh){
             switch(ch){
                 case ' ':
                     if(this.phase==0) this.phase = 1;
@@ -295,11 +369,14 @@ class VarController{
                     this.word = '';
                     this.phase = 2;
                     break;
-                case '"',"'":
+                case '"':
+                case "'":
                     if(this.phase==2 && this.apex == ch){
                         if(this.apex) this.apex = undefined;
                         else this.apex = ch;
                     }
+                case ";":
+                    this.finish();
                 default:
                     this.word += ch;
                     break;  
@@ -309,5 +386,6 @@ class VarController{
 
     finish(){
         this.Value = this.word;
+        this.phase = 3;
     }
 }
