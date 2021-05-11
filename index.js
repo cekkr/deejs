@@ -103,8 +103,6 @@ function parser(bag, filename, first=false){
         bag.filesProp = {};
     }
 
-    var breaks = 0;
-
     var res = fs.readFileSync(filename);
     var acc = '';
 
@@ -114,8 +112,8 @@ function parser(bag, filename, first=false){
     var counterInit = {line:bag.filesProp[absPath].line, col: bag.filesProp[absPath].col};
 
     var externals = ['<%', '{', '}',','];
-    var internals = ['include', 'out', '(',')', '%>',',','=',';'];
-    var shared =    ['var', 'const', 'let']
+    var internals = ['include', 'out', '(',')', '%>',',','=',';','echo'];
+    var shared =    ['var', 'const', 'let', "'", '"']
     var isInternal = false;
 
     var activators = internals;
@@ -123,13 +121,12 @@ function parser(bag, filename, first=false){
     var isInNormalTag = false;
     
     var isCalling = "";
+    var callPos = 0;
     var lastArg = -1;
     var args = [];
 
     var varCtrl = undefined;
     var vars = {};
-
-    var j=0;
 
     function write(str, register=false){
         acc += str;
@@ -137,7 +134,7 @@ function parser(bag, filename, first=false){
     }
 
     function writeCache(){
-        var b = breaks++;
+        var b = bag.breaks++;
         bag.parserOrder[absPath].push(b);
         var name = absPath+'_'+b;
         var fileName = 'cache/'+name+".ejs";
@@ -172,130 +169,241 @@ function parser(bag, filename, first=false){
         });
     }
 
+    let inString = undefined;
+    var str = '';
+    let j=0;
+
     for(; j<res.length; j++){
+
         nch = res[j];
         var ch = String.fromCharCode(nch);
-        acc += ch;
 
-        if(ch == '\n'){ 
-            bag.filesProp[absPath].line++;
-            bag.filesProp[absPath].col = 0;
-        }
-        else 
-            bag.filesProp[absPath].col++;
+        if(!inString){         
+            acc += ch;
 
-        if(varCtrl) varCtrl.read(ch)
-
-        var winner = -1;
-        for(var act of activators){
-            checkActivator(act);
-        }
-
-        if(winner==-1) for(var act of shared){
-            checkActivator(act);
-        }
-
-        function checkActivator(act){
-            for(var i=0; i<act.length; i++){
-                if(acc[(acc.length-act.length)+i] != act[i])
-                    break;
+            if(ch == '\n'){ 
+                bag.filesProp[absPath].line++;
+                bag.filesProp[absPath].col = 0;
             }
-            if(i == act.length){
-                 winner = act;
-            }
-        }
+            else 
+                bag.filesProp[absPath].col++;
 
-        function isLetter($word){
-            var patt = /[A-Z]|[a-z]|[0-9]/g
-            return patt.test($word);
-        }
+            if(varCtrl) varCtrl.read(ch)
 
-        function checkWord(before){
-            var word = '';
-            for(var i=acc.length-1-before; i>=0; i--){
-                if(isLetter(acc[i])){
-                    word = acc[i] + word;
+            function checkActivators(minPos=0){
+                var winner = -1;
+
+                for(var act of activators){
+                    checkActivator(act);
                 }
-                else
-                    if(word.length>0) break;
-            }
 
-            return word;
-        }
+                if(winner==-1) for(var act of shared){
+                    checkActivator(act);
+                }
 
-        switch(winner){
-            case 'var':
-            case 'let':
-            case 'const':
-                varCtrl = new VarController()
-                varCtrl.Type = winner;
-                varCtrl.Internal = isInternal;
-                break;
-
-            case '<%':
-                isInTag = true;
-                var next = res[j+1];
-                isInNormalTag = next != ' ' 
-                activators = internals;
-                isInternal = true;
-                break;
-            
-            case '%>':
-                isInTag = false;
-                isInNormalTag = false;
-                activators = externals;
-                isInternal = false;
-                break;
-
-            case '=':
-                var word = checkWord();
-                if(!varCtrl) {
-                    varCtrl = vars[word];
-                    if(!varCtrl) {
-                        //varCtrl = new VarController();
-                        //todo: error: variable not declared
+                function checkActivator(act){
+                    for(var i=0; i<act.length; i++){
+                        if(acc[(acc.length-act.length-minPos)+i] != act[i])
+                            break;
+                    }
+                    if(i == act.length){
+                        winner = act;
                     }
                 }
-                //else varCtrl.Name = word;
-                break;
 
-            case 'out':
-                isCalling = 'out';
-                break;
+                return winner;
+            }
 
-            case 'include':
-                isCalling = 'include';
-                break;
+            var winner = checkActivators();
 
-            case ',':
-                if(varCtrl){
-                    var type = varCtrl.Type;
-                    varCtrlFinish();
-                    varCtrl = new VarController();
-                    varCtrl.Type = type;
+            function isLetter($word){
+                var patt = /[A-Z]|[a-z]|[0-9]/g
+                return patt.test($word);
+            }
+
+            function checkWord(before=0){
+                var word = '';
+                var ret = 0;
+                for(var i=acc.length-1-before; i>=0; i--){
+                    if(isLetter(acc[i])){
+                        word = acc[i] + word;
+                    }
+                    else{
+                        if(word.length>0) break;
+                        else if(checkActivators(ret++) != -1)
+                            return undefined;
+                    }
                 }
-                break;
 
-            case '(':
-                lastArg = j;
-                break;
-            
-            case ',':
-                args.push(acc.substr(lastArg+1, j-lastArg-1));
-                lastArg = j;
-                break;
+                return word;
+            }
 
-            case ')':
-                args.push(acc.substr(lastArg+1, j-lastArg-1));
-                lastArg = j;
+            switch(winner){
+                case '"':
+                case "'":
+                    if(isInTag){
+                        inString = winner;
+                        acc = acc.substr(0,acc.length-1);
+                    }
+                    break;
 
-                if(isCalling == 'include'){
-                    acc = acc.substr(0,acc.indexOf('include'));
+                case 'var':
+                case 'let':
+                case 'const':
+                    varCtrl = new VarController()
+                    varCtrl.Type = winner;
+                    varCtrl.Internal = isInternal;
+                    break;
+
+                case '<%':
+                    isInTag = true;
+                    var next = res[j+1];
+                    isInNormalTag = next != ' ' 
+                    activators = internals;
+                    isInternal = true;
+                    break;
+                
+                case '%>':
+                    isInTag = false;
+                    isInNormalTag = false;
+                    activators = externals;
+                    isInternal = false;
+                    break;
+
+                case '=':
+                    var word = checkWord();
+                    if(!varCtrl && word) {
+                        varCtrl = vars[word];
+                        if(!varCtrl) {
+                            vars[word] = varCtrl = new VarController();
+                            varCtrl.Name = word;
+                        }
+                    }
+                    //else varCtrl.Name = word;
+                    break;
+
+                case 'out':
+                case 'include':
+                case 'echo':
+                    isCalling = winner;
+                    callPos = acc.length;
+                    break;
+
+                case ',':
+                    if(varCtrl){
+                        var type = varCtrl.Type;
+                        varCtrlFinish();
+                        varCtrl = new VarController();
+                        varCtrl.Type = type;
+                    }
+                    break;
+
+                case '(':
+                    lastArg = acc.length;
+                    break;
+                
+                case ',':
+                    args.push(acc.substr(lastArg+1, acc.length-lastArg-1));
+                    lastArg = acc.length;
+                    break;
+
+                case ')':
+                    args.push(acc.substr(lastArg+1, acc.length-lastArg-1));
+                    lastArg = acc.length;
+
+                    if(isCalling == 'include'){
+                        acc = acc.substr(0,callPos);
+                        write("%>", true);
+
+                        writeCache(acc);
+
+                        acc = "<% ";
+
+                        for(var v in vars){
+                            bag.obj[vars[v].Name] = vars[v].Value;
+                        }
+
+                        parser(bag, calculateRelativePos(filename, args.pop()));
+                        isCalling = undefined;
+                    } 
+
+                    break;
+
+                case ';':
+                case '\n':  
+                
+                    if(varCtrl)
+                        varCtrlFinish();
+                    else if(isCalling){
+                        switch(isCalling){
+                            case 'out':
+                                if(isInTag) acc += '%>'
+                                var v = vars[args[0]];
+                                acc += v.Type +' '+ args[0];
+                                if(v.Value) acc += '='+v.Value;
+                                if(isInTag) acc += '<%'
+                                break;
+                            case 'echo':
+                                var newAcc = acc.substr(0, callPos-4);
+                                if(isInTag) newAcc += '%>';
+                                newAcc += '<%=' + acc.substr(callPos+4,j-(callPos+4));
+                                var argStr = '';
+                                while(args.length>0) argStr = argStr + args.pop() ;
+                                newAcc += argStr;
+                                newAcc += '%>';
+                                if(isInTag) newAcc += '<%'
+                                acc = newAcc;
+                                break;
+                            case 'include':
+                                acc = acc.substr(0,callPos-'include'.length);
+                                write("%>", true);
+
+                                writeCache(acc);
+
+                                acc = "<% ";
+
+                                for(var v in vars){
+                                    bag.obj[vars[v].Name] = vars[v].Value;
+                                }
+
+                                var toInclude = args.pop();
+                                //toInclude = toInclude.substr(1, toInclude.length-1);
+                                parser(bag, calculateRelativePos(filename, toInclude));
+                                isCalling = undefined;
+                                break;
+                        }
+                    }
+                    else {
+                        //acc = acc.substr(0, acc.length-1);
+                    }
+
+                    break;
+
+                case -1:
+
+                    break;
+            }
+
+            function varCtrlFinish(){
+                if(varCtrl){
+                    vars[varCtrl.Name] = varCtrl;
+                    varCtrl = undefined;
+                }
+            }
+        }
+        else
+            if(ch == inString){
+                inString = undefined;
+                args.push(ch+str+ch)
+                str = '';
+
+                /*if(isCalling == 'include'){
+                    acc = acc.substr(0,callPos-'include'.length);
                     write("%>", true);
 
                     writeCache(acc);
 
-                    acc = "<%";
+                    acc = "<% ";
 
                     for(var v in vars){
                         bag.obj[vars[v].Name] = vars[v].Value;
@@ -303,42 +411,14 @@ function parser(bag, filename, first=false){
 
                     parser(bag, calculateRelativePos(filename, args[0]));
                     isCalling = undefined;
-                } 
-
-                break;
-
-            case ';':
-            case '\n':  
-            
-                varCtrlFinish();
-            
-                if(isCalling){
-                    switch(isCalling){
-                        case 'out':
-                            if(isInTag) acc += '%>'
-                            var v = vars[args[0]];
-                            acc += v.Type +' '+ args[0];
-                            if(v.Value) acc += '='+v.Value;
-                            if(isInTag) acc += '<%'
-                            break;
-                    }
-                }
-
-                break;
-
-            case -1:
-
-                break;
-        }
-
-        function varCtrlFinish(){
-            if(varCtrl){
-                vars[varCtrl.Name] = varCtrl;
-                varCtrl = undefined;
+                } */
             }
-        }
+            else {
+                str += ch;
+            }
     }
 
+    if(isInTag) write("%>", true);
     writeCache(acc);
 
     if(first)
