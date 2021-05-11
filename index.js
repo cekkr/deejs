@@ -103,12 +103,11 @@ function parser(bag, filename, first=false){
         bag.obj = {data:23};
     }
 
-    var breaks = 0;
     var res = fs.readFileSync(filename);
     var acc = '';
 
-    var absPath = path.resolve(filename).replace('/','-').replace('\\','-');
-    parserOrder[absPath] = [];
+    var absPath = path.resolve(filename).replaceAll('/','-').replaceAll('\\','-').replaceAll(':','');
+    bag.parserOrder[absPath] = [];
 
     var externals = ['<%', '{', '}',','];
     var internals = ['include', 'out', '(',')', '%>',','];
@@ -130,12 +129,13 @@ function parser(bag, filename, first=false){
 
     function write(str, register=false){
         acc += str;
-        if(register) j += str.length;
+        if(!register) j += str.length;
     }
 
+    var breaks = 0;
     function writeCache(){
         var b = breaks++;
-        parserOrder[absPath].push(b);
+        bag.parserOrder[absPath].push(b);
         var name = absPath+'_'+breaks++;
         var fileName = 'cache/'+name+".ejs";
         composition.push(fileName);
