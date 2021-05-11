@@ -4,6 +4,8 @@ let ejs = require('ejs');
 const ejsLint = require('ejs-lint');
 var path = require("path");
 
+const utils = require('./utils');
+
 const options = {
   key: fs.readFileSync('privateKey.key'),
   cert: fs.readFileSync('certificate.crt')
@@ -11,7 +13,7 @@ const options = {
 
 console.log(process.cwd());
 
-var supportedFormats = ['ejs','html']
+var supportedFormats = ['ejs','html'];
 
 function searchPath(url){
     url = 'htdocs/'+url;
@@ -74,6 +76,7 @@ https.createServer(options, (req, res) => {
     else {
         res.writeHead(200);
 
+
         parser(bag, analyze.file, true);
 
         /**/
@@ -94,31 +97,73 @@ function calculateRelativePos(from, to){
     return (dir + path.basename(to)).replace('//','/');
 }
 
-function parser(bag, filename, first=false){
-    if(first){
+class Bag{
+    constructor(){
         bag.breaks = 0;
         bag.parserOrder = {};
         bag.obj = {data:23};
         bag.composition = [];
         bag.filesProp = {};
+
+        bag.parent = undefined;
+    }
+
+    enter(){
+        var nbag = new Bag();
+        for(var p in this)
+            nbag[p] = this[p];
+
+        nbag.parent = this;
+        nbag.obj = utils.copyInNewObject(nbag.obj);
+        return nbag;
+    }
+
+    exit(){
+        return this.parent;
+    }
+}
+
+function parser(filename, bag=undefined, first=false){
+    if(first){
+        bag = new Bag();
     }
 
     var res = fs.readFileSync(filename);
     var acc = '';
 
+    ///
+    /// Helpers
+    ///
+    function appendHelper(name){
+        var app = fs.readFileSync('helpers/'+name+".ejs");
+        acc += app;
+        //todo handle relative lines
+    }
+
+    appendHelper("top");
+
+    ///
+    /// Calculate paths and lines
+    ///
     var absPath = path.resolve(filename).replaceAll('/','-').replaceAll('\\','-').replaceAll(':','');
     if(bag.filesProp[absPath] == undefined) bag.filesProp[absPath] = {line: 0, col: 0};
     bag.parserOrder[absPath] = [];
     var counterInit = {line:bag.filesProp[absPath].line, col: bag.filesProp[absPath].col};
 
-    var externals = ['<%', '{', '}',','];
-    var internals = ['include', 'out', '(',')', '%>',',','=',';','echo'];
+    ///
+    /// Recognize keywords
+    ///
+    var externals = ['<%','<script>','</script>'];
+    var internals = ['include', 'out', '(',')', '%>',',','=',';','echo', '{', '}'];
     var shared =    ['var', 'const', 'let', "'", '"']
     var isInternal = false;
 
+    ///
+    /// General toggle
+    ///
     var activators = internals;
     var isInTag = false;
-    var isInNormalTag = false;
+    var isInScript = false;
     
     var isCalling = "";
     var callPos = 0;
@@ -128,6 +173,9 @@ function parser(bag, filename, first=false){
     var varCtrl = undefined;
     var vars = {};
 
+    ///
+    /// Write functions
+    ///
     function write(str, register=false){
         acc += str;
         if(!register) j += str.length;
@@ -173,6 +221,9 @@ function parser(bag, filename, first=false){
     var str = '';
     let j=0;
 
+    ///
+    /// Cycle ejs result
+    ///
     for(; j<res.length; j++){
 
         nch = res[j];
@@ -239,6 +290,24 @@ function parser(bag, filename, first=false){
             }
 
             switch(winner){
+                case '{':
+                    if(isInTag)
+                        bag = bag.enter();
+                    break;
+
+                case '}':
+                    if(isInTag)
+                        bag = bag.exit();
+                    break;
+
+                case '<script>':
+                    if(!isInTag) isInScript = true;
+                    break;
+
+                case '</script>':
+                    if(!isInTag) isInScript = false;
+                    break;
+
                 case '"':
                 case "'":
                     if(isInTag){
@@ -323,7 +392,7 @@ function parser(bag, filename, first=false){
                             bag.obj[vars[v].Name] = vars[v].Value;
                         }
 
-                        parser(bag, calculateRelativePos(filename, args.pop()));
+                        parser(calculateRelativePos(filename, bag, args.pop()));
                         isCalling = undefined;
                     } 
 
@@ -396,22 +465,6 @@ function parser(bag, filename, first=false){
                 inString = undefined;
                 args.push(ch+str+ch)
                 str = '';
-
-                /*if(isCalling == 'include'){
-                    acc = acc.substr(0,callPos-'include'.length);
-                    write("%>", true);
-
-                    writeCache(acc);
-
-                    acc = "<% ";
-
-                    for(var v in vars){
-                        bag.obj[vars[v].Name] = vars[v].Value;
-                    }
-
-                    parser(bag, calculateRelativePos(filename, args[0]));
-                    isCalling = undefined;
-                } */
             }
             else {
                 str += ch;
