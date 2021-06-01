@@ -107,9 +107,12 @@ class Bag{
     constructor(){
         this.breaks = 0;
         this.parserOrder = {};
-        this.obj = {data:23};
         this.composition = [];
         this.filesProp = {};
+        this.bagJS = new BagJS();
+
+        // Append vars
+        this.obj = {data:23};
 
         this.parent = undefined;
     }
@@ -121,6 +124,29 @@ class Bag{
 
         nbag.parent = this;
         nbag.obj = utils.copyInNewObject(nbag.obj);
+
+        return nbag;
+    }
+
+    exit(){
+        return this.parent;
+    }
+}
+
+class BagJS{
+    constructor(){
+        // Append vars
+        this.vars = {};
+    }
+
+    enter(){
+        var nbag = new BagJS();
+        for(var p in this)
+            nbag[p] = this[p];
+
+        nbag.parent = this;
+        nbag.vars = utils.copyInNewObject(nbag.vars);
+
         return nbag;
     }
 
@@ -160,14 +186,14 @@ function parser(filename, bag=undefined, first=false){
     /// Recognize keywords
     ///
     var externalsSyms = ['<%','<script>','</script>'];
-    var internalsSyms = ['include', 'out', '(',')', '%>',',','=',';','echo', '{', '}'];
-    var sharedSyms =    ['var', 'const', 'let', "'", '"']
+    var internalsSyms = ['include', 'out', 'echo', 'require', '(',')', '%>',',',';'];
+    var sharedSyms =    ['var', 'const', 'let', "'", '"', '{', '}', '=']
     var isInternal = false;
 
     ///
     /// General toggle
     ///
-    var activators = externalsSyms;
+    var activators = externalsSyms; //starts with external syms
     var isInTag = false;
     var isInScript = false;
     
@@ -177,7 +203,7 @@ function parser(filename, bag=undefined, first=false){
     var args = [];
 
     var varCtrl = undefined;
-    var vars = {};
+    var vars = bag.bagJS.vars;
 
     ///
     /// Write functions
@@ -263,6 +289,10 @@ function parser(filename, bag=undefined, first=false){
                     checkActivator(act);
                 }
 
+                if(isInScript) for(var act of externalsSyms){
+                    checkActivator(act);
+                }
+
                 function checkActivator(act){
                     for(var i=0; i<act.length; i++){
                         if(acc[(acc.length-act.length-minPos)+i] != act[i])
@@ -304,45 +334,55 @@ function parser(filename, bag=undefined, first=false){
                 return word;
             }
 
-            if(isInTag || isInScript){
+            if(!isInTag){
                 switch(winner){
-                    case 'var':
-                    case 'let':
-                    case 'const':
-                        varCtrl = new VarController()
-                        varCtrl.Type = winner;
-                        varCtrl.Internal = isInternal;
+                    case '<%':
+                        isInTag = true;
+                        var next = res[j+1];
+                        isInNormalTag = next != ' ' 
+                        activators = internalsSyms;
+                        isInternal = true;
+                        break;
+                }
+            }
+
+            if(isInTag){
+                vars = bag.obj;
+
+                switch(winner){
+                    case '{':
+                        bag = bag.enter();
                         break;
 
-                    case '=':
-                        var word = checkWord();
-                        if(!varCtrl && word) {
-                            varCtrl = vars[word];
-                            if(!varCtrl) {
-                                vars[word] = varCtrl = new VarController();
-                                varCtrl.Name = word;
-                            }
+                    case '}':
+                        bag = bag.exit();
+                        break;
+
+                    case '"':
+                    case "'":
+                        if(isInTag){
+                            inString = winner;
+                            acc = acc.substr(0,acc.length-1);
                         }
-                        //else varCtrl.Name = word;
                         break;
 
+                    case '%>':
+                        isInTag = false;
+                        isInNormalTag = false;
+                        activators = externalsSyms;
+                        isInternal = false;
+                        break;
+                    
+                    
                     ///
-                    /// Special functions management (to move in inTag?)
+                    /// Special functions management 
                     ///
                     case 'out':
                     case 'include':
                     case 'echo':
+                    case 'require':
                         isCalling = winner;
                         callPos = acc.length;
-                        break;
-    
-                    case ',':
-                        if(varCtrl){
-                            var type = varCtrl.Type;
-                            varCtrlFinish();
-                            varCtrl = new VarController();
-                            varCtrl.Type = type;
-                        }
                         break;
     
                     case '(':
@@ -350,8 +390,10 @@ function parser(filename, bag=undefined, first=false){
                         break;
                     
                     case ',':
-                        args.push(acc.substr(lastArg+1, acc.length-lastArg-1));
-                        lastArg = acc.length;
+                        if(isCalling){
+                            args.push(acc.substr(lastArg+1, acc.length-lastArg-1));
+                            lastArg = acc.length;
+                        }
                         break;
     
                     case ')':
@@ -378,10 +420,7 @@ function parser(filename, bag=undefined, first=false){
     
                     case ';':
                     case '\n':  
-                    
-                        if(varCtrl)
-                            varCtrlFinish();
-                        else if(isCalling){
+                        if(isCalling){
                             switch(isCalling){
                                 case 'out':
                                     if(isInTag) acc += '%>'
@@ -390,6 +429,7 @@ function parser(filename, bag=undefined, first=false){
                                     if(v.Value) acc += '='+v.Value;
                                     if(isInTag) acc += '<%'
                                     break;
+
                                 case 'echo':
                                     var newAcc = acc.substr(0, callPos-4);
                                     if(isInTag) newAcc += '%>';
@@ -401,6 +441,7 @@ function parser(filename, bag=undefined, first=false){
                                     if(isInTag) newAcc += '<%'
                                     acc = newAcc;
                                     break;
+
                                 case 'include':
                                     acc = acc.substr(0,callPos-'include'.length);
                                     write("%>", true);
@@ -418,6 +459,10 @@ function parser(filename, bag=undefined, first=false){
                                     parser(calculateRelativePos(filename, toInclude), bag);
                                     isCalling = undefined;
                                     break;
+
+                                case 'require':
+                                    //todo
+                                    break;
                             }
                         }
                         else {
@@ -427,49 +472,20 @@ function parser(filename, bag=undefined, first=false){
                         break;
                 }
             }
-
-            if(!isInTag){
-                switch(winner){
-                    case '<%':
-                        isInTag = true;
-                        var next = res[j+1];
-                        isInNormalTag = next != ' ' 
-                        activators = internalsSyms;
-                        isInternal = true;
-                        break;
-                }
-            }
-
-            if(isInTag){
-                switch(winner){
-                    case '{':
-                        bag = bag.enter();
-                        break;
-
-                    case '}':
-                        bag = bag.exit();
-                        break;
-
-                    case '"':
-                    case "'":
-                        if(isInTag){
-                            inString = winner;
-                            acc = acc.substr(0,acc.length-1);
-                        }
-                        break;
-
-                    case '%>':
-                        isInTag = false;
-                        isInNormalTag = false;
-                        activators = externalsSyms;
-                        isInternal = false;
-                        break;
-                }
-            }
             else if(isInScript){
+                vars = bag.bagJS.vars;
+
                 switch(winner){
                     case '</script>':
                         isInScript = false;
+                        break;
+
+                    case '{':
+                        bag.bagJS = bag.bagJS.enter();
+                        break;
+
+                    case '}':
+                        bag.bagJS = bag.bagJS.exit();
                         break;
                 }
             }
@@ -478,6 +494,44 @@ function parser(filename, bag=undefined, first=false){
                     case '<script>':
                         isInScript = true;
                         break;
+                }
+            }
+
+            if(isInTag || isInScript){
+                switch(winner){
+                    case 'var':
+                    case 'let':
+                    case 'const':
+                        varCtrl = new VarController()
+                        varCtrl.Type = winner;
+                        varCtrl.Internal = isInternal;
+                        break;
+
+                    case '=':
+                        var word = checkWord();
+                        if(!varCtrl && word) {
+                            varCtrl = vars[word];
+                            if(!varCtrl) {
+                                vars[word] = varCtrl = new VarController();
+                                varCtrl.Name = word;
+                            }
+                        }
+                        //else varCtrl.Name = word;
+                        break;
+
+                    case ',':
+                        if(varCtrl){
+                            var type = varCtrl.Type;
+                            varCtrlFinish();
+                            varCtrl = new VarController();
+                            varCtrl.Type = type;
+                        }
+                        break;
+
+                    case ';':
+                    case '\n':             
+                        if(varCtrl)
+                            varCtrlFinish();
                 }
             }
 
