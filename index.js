@@ -289,7 +289,7 @@ function parser(filename, bag=undefined, first=false){
                     checkActivator(act);
                 }
 
-                if(isInScript) for(var act of externalsSyms){
+                if(activators != externalSyms && isInScript) for(var act of externalsSyms){
                     checkActivator(act);
                 }
 
