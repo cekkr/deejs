@@ -222,6 +222,7 @@ function parser(filename, bag=undefined, first=false){
         fs.writeFileSync(fileName, acc);
 
         try{
+            console.log('bag.obj', bag.obj);
             ejs.renderFile(fileName, bag.obj, {}, function(err, str){    
                 if(err){
                     var file = fs.readFileSync(fileName);
@@ -289,7 +290,7 @@ function parser(filename, bag=undefined, first=false){
                     checkActivator(act);
                 }
 
-                if(activators != externalSyms && isInScript) for(var act of externalsSyms){
+                if(activators != externalsSyms && isInScript) for(var act of externalsSyms){
                     checkActivator(act);
                 }
 
@@ -347,7 +348,7 @@ function parser(filename, bag=undefined, first=false){
             }
 
             if(isInTag){
-                vars = bag.obj;
+                vars = bag.obj; //todo: change to bag.vars
 
                 switch(winner){
                     case '{':
