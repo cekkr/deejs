@@ -4,4 +4,12 @@ da qui in poi... il nulla
 
 <%
     %><%="ciao"%><%
+
+    async function test(){
+        %><%="riciao"%><%
+        var resp = await func()%><%
+        %><%=resp%><%
+    }
+
+    test()%><%
 %>

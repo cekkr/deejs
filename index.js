@@ -112,7 +112,12 @@ class Bag{
         this.bagJS = new BagJS();
 
         // Append vars
-        this.obj = {data:23};
+        this.obj = {data:23, func: async function(){
+            return new Promise( ( resolve, reject ) => {
+                resolve( 'successPayload' );
+                // reject( 'errorPayload' );
+            });
+        }};
 
         this.parent = undefined;
     }
@@ -208,6 +213,9 @@ function parser(filename, bag=undefined, first=false){
     ///
     /// Write functions
     ///
+
+    let wrAcc = 0;
+
     function write(str, register=false){
         acc += str;
         if(!register) j += str.length;
@@ -220,10 +228,11 @@ function parser(filename, bag=undefined, first=false){
         var fileName = 'cache/'+name+".ejs";
         bag.composition.push(fileName);
         fs.writeFileSync(fileName, acc);
+        //wrAcc += acc.length;
 
         try{
             console.log('bag.obj', bag.obj);
-            ejs.renderFile(fileName, bag.obj, {}, function(err, str){    
+            ejs.renderFile(fileName, bag.obj, {outputFunctionName: 'print'}, function(err, str){    
                 if(err){
                     var file = fs.readFileSync(fileName);
                     var fileErr = ejsLint(file.toString());
@@ -263,13 +272,12 @@ function parser(filename, bag=undefined, first=false){
     /// Cycle ejs result
     ///
     for(; j<res.length; j++){
-
         nch = res[j];
         var ch = String.fromCharCode(nch);
 
-        if(!inString){         
-            acc += ch;
+        acc += ch;
 
+        if(!inString){                     
             if(ch == '\n'){ 
                 bag.filesProp[absPath].line++;
                 bag.filesProp[absPath].col = 0;
@@ -361,10 +369,8 @@ function parser(filename, bag=undefined, first=false){
 
                     case '"':
                     case "'":
-                        if(isInTag){
-                            inString = winner;
-                            acc = acc.substr(0,acc.length-1);
-                        }
+                        inString = winner;
+                        //acc = acc.substr(0,acc.length-1);                        
                         break;
 
                     case '%>':
@@ -433,13 +439,15 @@ function parser(filename, bag=undefined, first=false){
 
                                 case 'echo':
                                     var newAcc = acc.substr(0, callPos-4);
-                                    if(isInTag) newAcc += '%>';
-                                    newAcc += '<%=' + acc.substr(callPos+4,j-(callPos+4));
-                                    var argStr = '';
-                                    while(args.length>0) argStr = argStr + args.pop() ;
-                                    newAcc += argStr;
+                                    console.log("newAcc", callPos);                                  
                                     newAcc += '%>';
-                                    if(isInTag) newAcc += '<%'
+                                    //console.log("piece", acc.substr(callPos-2,jAcc-(callPos+2)), args, callPos, jAcc);
+                                    newAcc += '<%=' + acc.substr(callPos+1,acc.length-(callPos+2));
+                                    /*var argStr = '';
+                                    while(args.length>0) argStr = argStr + args.pop() ;
+                                    newAcc += argStr;*/
+                                    newAcc += '%>';
+                                    newAcc += '<%'
                                     acc = newAcc;
                                     break;
 
@@ -544,12 +552,13 @@ function parser(filename, bag=undefined, first=false){
 
             function varCtrlFinish(){
                 if(varCtrl){
-                    vars[varCtrl.Name] = varCtrl;
+                    if(vars)
+                        vars[varCtrl.Name] = varCtrl;
                     varCtrl = undefined;
                 }
             }
         }
-        else
+        else {
             if(ch == inString){
                 inString = undefined;
                 args.push(ch+str+ch)
@@ -558,6 +567,7 @@ function parser(filename, bag=undefined, first=false){
             else {
                 str += ch;
             }
+        }
     }
 
     if(isInTag) write("%>", true);
