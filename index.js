@@ -5,6 +5,8 @@ const ejsLint = require('ejs-lint');
 var path = require("path");
 
 const utils = require('./utils');
+const Parser = require('./parser');
+const Bag = require('./bag');
 
 /*const options = {
   key: fs.readFileSync('privateKey.key'),
@@ -17,8 +19,12 @@ console.log(process.cwd());
 var supportedFormats = ['ejs','html'];
 var currentDir = 'htdocs/';
 
-function searchPath(url){
-    url = currentDir+url;
+function searchPath(url, bag){
+    if(bag){
+        //todo
+    }
+    else
+        url = currentDir+url;
 
     if(fs.existsSync(url)){
         if(fs.lstatSync(url).isDirectory()){
@@ -62,15 +68,6 @@ console.log("Listening on 8000");
 http.createServer((req, res) => {
     console.log("Requested "+req.url);
 
-    var bag = {
-        req: req,
-        res: res
-    };
-
-    bag = new Bag();
-    bag.req = req;
-    bag.res = res;
-
     //Analyze req.url
     var analyze = searchPath(req.url);
     //currentFile = path.dirname(analyze.file);
@@ -82,10 +79,12 @@ http.createServer((req, res) => {
     }
     else {
         res.writeHead(200);
-        parser(analyze.file, bag);
-        res.end(); // to improve
 
-        /**/
+        var bag = new Bag(currentDir, searchPath, req, res);
+
+        Parser(bag, fs.readFileSync(analyze.file), function(){
+            res.end();
+        });
     }
 
 }).listen(8000);
@@ -103,7 +102,7 @@ function calculateRelativePos(from, to){
     return (dir + path.basename(to)).replace('//','/');
 }
 
-class Bag{
+/*class Bag{
     constructor(){
         this.breaks = 0;
         this.parserOrder = {};
@@ -161,9 +160,9 @@ class BagJS{
 }
 
 function parser(filename, bag=undefined, first=false){
-    /*if(first){
+    if(first){
         bag = new Bag();
-    }*/
+    }
 
     var res = fs.readFileSync(filename);
     var acc = '';
@@ -443,9 +442,9 @@ function parser(filename, bag=undefined, first=false){
                                     newAcc += '%>';
                                     //console.log("piece", acc.substr(callPos-2,jAcc-(callPos+2)), args, callPos, jAcc);
                                     newAcc += '<%=' + acc.substr(callPos+1,acc.length-(callPos+2));
-                                    /*var argStr = '';
-                                    while(args.length>0) argStr = argStr + args.pop() ;
-                                    newAcc += argStr;*/
+                                    //var argStr = '';
+                                    //while(args.length>0) argStr = argStr + args.pop() ;
+                                    //newAcc += argStr;
                                     newAcc += '%>';
                                     newAcc += '<%'
                                     acc = newAcc;
@@ -544,12 +543,6 @@ function parser(filename, bag=undefined, first=false){
                 }
             }
 
-            /*switch(winner){
-                case -1:
-
-                    break;
-            }*/
-
             function varCtrlFinish(){
                 if(varCtrl){
                     if(vars)
@@ -620,4 +613,4 @@ class VarController{
         this.Value = this.word;
         this.phase = 3;
     }
-}
+}*/
