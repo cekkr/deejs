@@ -5,7 +5,21 @@ const Bag = require('./bag');
 ///
 class Instruction{
     constructor(name){
-        
+        this.name = name;
+
+        this.content = "";
+        this.instructions = [];
+        this.curInstr = undefined;
+    }
+
+    insert(instr){
+        if(this.curInstr && instr.name.startsWith(this.curInstr.name)){
+            this.curInstr.insert(instr);
+        }
+        else {
+            this.instructions.push(instr);
+            this.curInstr = instr;
+        }
     }
 }
 
@@ -29,7 +43,7 @@ const disks = {
         },
         {
             match: function(ch, bag){
-                bag.httpBuffer = ch;
+                bag.instruction.curInstr.content += ch;
             }
         }
     ],
@@ -63,14 +77,19 @@ const disks = {
 
 function Parser(bag, str, cbk){
     bag.httpBuffer = "";
-    bag.disk = disks.root;
+    bag.instruction = new Instruction();
     bag.args = [];
 
     var lastCont;
 
     function changeDisk(ret){
-        if(ret) bag.disks = eval('disks.'+ret);
+        if(ret){ 
+            bag.instruction.insert(ret);
+            bag.disk = eval('disks.'+ret);
+        }
     }
+
+    changeDisk('root');
 
     let j = 0;
     for(; j<str.length; j++){
