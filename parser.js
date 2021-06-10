@@ -19,7 +19,25 @@ class Instruction{
         else {
             this.instructions.push(instr);
             this.curInstr = instr;
+            instr.parent = this;
         }
+    }
+
+    getInstr(){
+        if(this.curInstr)
+            return this.curInstr.getInstr();
+        else
+            return this;
+    }
+
+    newChild(){
+        var instr = new Instruction(this.instructions.length);
+        return instr;
+    }
+
+    check(property){
+        if(this.property==undefined)
+            this.property = "";
     }
 }
 
@@ -43,7 +61,7 @@ const disks = {
         },
         {
             match: function(ch, bag){
-                bag.instruction.curInstr.content += ch;
+                bag.instruction.getInstr().content += ch;
             }
         }
     ],
@@ -69,7 +87,60 @@ const disks = {
             }
         ],
         function: {
+            MatchesOrder: true,
+            Matches: [
+                {
+                    type: 'optional',
+                    match: function(ch, bag){
+                        if(isLetter(ch)){
+                            var instr = bag.instruction.getInstr();
+                            instr.check("functionName");
+                            instr.functionName += ch;
 
+                            return true;
+                        }
+
+                        return false;
+                    }
+                }, 
+                {
+                    type: 'mandatory',
+                    match: '(',
+                    action: function(){
+                        return '.arguments'
+                    }
+                }
+            ],
+            arguments: {
+                OnStart: function(bag){
+                    bag._argNum = 0;
+                },
+                MatchesOrder: true,
+                Matches: [
+                    {
+                        type: 'mandatory',
+                        match: function(ch, bag){
+                            if(isLetter(ch)){
+                                var instr = bag.instruction.getInstr().newChild();
+                                bag._curChild = instr;
+                                instr.check("argName");
+                                instr.argName += ch;
+    
+                                return true;
+                            }
+    
+                            return false;
+                        }
+                    }
+                    {
+                        type: 'optional',
+                        match: '=',
+                        action: function(){
+                            
+                        }
+                    }
+                ]
+            }
         }
     }
 };
@@ -81,11 +152,20 @@ function Parser(bag, str, cbk){
     bag.args = [];
 
     var lastCont;
+    var lastDiskStr;
 
     function changeDisk(ret){
         if(ret){ 
+            if(ret[0]==46 && lastDiskStr)
+                ret = lastDiskStr+ret;
+
             bag.instruction.insert(ret);
             bag.disk = eval('disks.'+ret);
+
+            if(bag.disk.OnStart) 
+                bag.disk.OnStart(bag);
+
+            lastDiskStr = ret;
         }
     }
 
