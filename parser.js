@@ -54,8 +54,16 @@ class Instruction{
 ///
 /// Char utils
 ///
+function isNumeric(nch){
+    return  nch>=48&&nch<=57;
+}
+
+function isAlpha(nch){
+    return (nch>=65&&nch<=90)||(nch>=97&&nch<=122);
+}
+
 function isAlphaNumeric(nch){
-    return (nch>=48&&nch<=57)||(nch>=65&&nch<=90)||(nch>=97&&nch<=122);
+    return isNumeric(nch)||isAlpha(nch);
 }
 
 ///
@@ -99,7 +107,11 @@ const disks = {
         number: {
             Matches: [
                 {
-
+                    match: function(ch, bag){
+                        if(isNumeric(ch)){
+                            //...
+                        }
+                    }
                 }
             ]
         },
@@ -107,7 +119,9 @@ const disks = {
             MatchesOrder: true,
             Matches: [
                 {
+                    match: function(ch, bag){
 
+                    }
                 }
             ]
         },
