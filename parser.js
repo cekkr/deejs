@@ -57,6 +57,11 @@ class Instruction{
             return parent.getDisk(name);
         return null; //or get error
     }
+
+    close(){
+        this.parent.curInstr = undefined;
+        return this.parent;
+    }
 }
 
 ///
@@ -220,6 +225,17 @@ const disks = {
     }
 };
 
+function initDisks(disk=undefined){
+    if(!disk) disk = disks;
+    for(var p in disk){
+        if(typeof disk[p] == 'object'){
+            disk[p]._parent = disk;
+            initDisks(disk[p]);
+        }
+    }
+}
+
+initDisks();
 
 function Parser(bag, str, cbk){
     bag.httpBuffer = "";
@@ -238,8 +254,9 @@ function Parser(bag, str, cbk){
             var instr = bag.instruction.getInstr().insert(ret);
 
             var disk = ret;
-            if(typeof ret == 'string')
+            if(typeof ret == 'string'){
                 disk = eval('disks.'+ret);
+            }
             bag.disk = disk;
             instr._disk = disk;
 
@@ -262,6 +279,7 @@ function Parser(bag, str, cbk){
         var ch = String.fromCharCode(nch);
 
         var instr = bag.getInstr();
+        var curDisk; // I know, it's ugly
 
         function checkMatch(match){
             if(typeof match == 'string'){
@@ -269,7 +287,8 @@ function Parser(bag, str, cbk){
             }
             else if(typeof match.match == 'function'){
                 if(match.match(ch, bag)){                    
-                    changeDisk(match.action(bag));
+                    if(match.action) 
+                        changeDisk(match.action(bag));
                     lastMatch = match;
                     return true;
                 }
@@ -285,17 +304,27 @@ function Parser(bag, str, cbk){
                     }
 
                     if(validated){
-                        changeDisk(match.action(bag));
+                        if(match.action)
+                            changeDisk(match.action(bag));
                         lastMatch = match;
                         return true;
                     }
                 }
             }
 
+            ///
+            /// Get back if instruction is finished
+            ///
+            if(instr._disk == curDisk){
+                instr = instr.close();
+                evaluateDisk(instr._disk);
+            }
+
             return false;
         }
 
         function evaluateDisk(disk){
+            curDisk = disk;
             var matches = disk;
 
             if(!Array.isArray(disk)){ 
@@ -319,7 +348,7 @@ function Parser(bag, str, cbk){
                                 break;
 
                             case 'exit':
-                                changeDisk(instr.parent.name);
+                                changeDisk(instr.parent._disk);
 
                             default: 
                                 instr._curOrder++;
@@ -332,6 +361,7 @@ function Parser(bag, str, cbk){
                         switch(match.type){
                             case 'mandatory':
                                 pos = -1;
+                                //todo: exception
                                 break;
 
                             case 'optional':
@@ -351,8 +381,9 @@ function Parser(bag, str, cbk){
                 }
             }
             else {
-                if(typeof matches == 'string')
+                if(typeof matches == 'string'){
                     checkMatch(match);
+                }
                 else {
                     for(var match of matches){
                         checkMatch(match)
