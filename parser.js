@@ -96,6 +96,21 @@ const disks = {
                 }
             }
         ],
+        number: {
+            Matches: [
+                {
+
+                }
+            ]
+        },
+        string: {
+            MatchesOrder: true,
+            Matches: [
+                {
+
+                }
+            ]
+        },
         function: {
             MatchesOrder: true,
             Matches: [
@@ -164,7 +179,10 @@ const disks = {
                     }
                 ],
                 assign: {
-
+                    Matches:[
+                        'number',
+                        'string'
+                    ]
                 }
             }
         }
