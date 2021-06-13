@@ -135,7 +135,8 @@ const disks = {
         whitespace: {
             Matches: function(ch){
                 return isWhitespace(ch);
-            }
+            },
+            Transparent: true
         },
         value: {
             number: {
@@ -277,7 +278,7 @@ function Parser(bag, str, cbk){
 
     function changeDisk(ret){
         if(ret){ 
-            var instr = bag.instruction.getInstr().insert(ret);
+            var instr = bag.instruction.getInstr();
 
             var disk = ret;
             if(typeof ret == 'string'){
@@ -296,8 +297,13 @@ function Parser(bag, str, cbk){
                     }
                 }
 
+                if(!disk.Transparent)
+                    instr = instr.insert(ret);
+
                 lastDiskStr = ret;
             }
+
+            //todo: insert ad hoc instruction if disk is object
 
             bag.disk = disk;
             instr._disk = disk;
@@ -346,6 +352,14 @@ function Parser(bag, str, cbk){
                 }
                 else
                     changeDisk(instr.getDisk(match));
+            }
+            else if(match.RefMatch){
+                var disk = curDisk._parent;
+                while(disk && !disk[match.RefMatch]){
+                    disk = disk._parent;
+                }
+                if(disk)
+                    checkMatch(disk);
             }
             else if(typeof match.match == 'function'){
                 if(match.match(ch, bag)){                    
@@ -432,7 +446,7 @@ function Parser(bag, str, cbk){
                                 break;
                         }
 
-                        objMatch.match = match.substr(i, match.length-i);
+                        objMatch.RefMatch = match.substr(i, match.length-i);
                         match = objMatch;
                     }
 
