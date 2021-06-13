@@ -1,0 +1,4 @@
+ciao
+<?
+function test(ciao)
+?>

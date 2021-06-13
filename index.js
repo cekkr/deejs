@@ -64,6 +64,16 @@ function searchPath(url, bag){
     return res;
 }*/
 
+if(true){
+    ///
+    /// alpha test
+    ///
+    var bag = new Bag(currentDir, searchPath, null, null);
+    Parser(bag, fs.readFileSync("htdocs/test.js.php"), function(){
+        console.log("end");
+    });
+}
+
 console.log("Listening on 8000");
 http.createServer((req, res) => {
     console.log("Requested "+req.url);

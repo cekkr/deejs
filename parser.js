@@ -53,8 +53,8 @@ class Instruction{
     getDisk(name){
         if(this[name] !== undefined)
             return this[name];
-        else if(parent !== undefined)
-            return parent.getDisk(name);
+        else if(this.parent !== undefined)
+            return this.parent.getDisk(name);
         return null; //or get error
     }
 
@@ -68,10 +68,12 @@ class Instruction{
 /// Char utils
 ///
 function isNumeric(nch){
+    if(isNaN(nch)) nch = nch.charCodeAt(0);
     return  nch>=48&&nch<=57;
 }
 
 function isAlpha(nch){
+    if(isNaN(nch)) nch = nch.charCodeAt(0);
     return (nch>=65&&nch<=90)||(nch>=97&&nch<=122);
 }
 
@@ -80,7 +82,13 @@ function isAlphaNumeric(nch){
 }
 
 function isWhitespace(nch){
+    if(isNaN(nch)) nch = nch.charCodeAt(0);
     return nch == 32 || nch == 9;
+}
+
+function isSymbol(nch){
+    if(isNaN(nch)) nch = nch.charCodeAt(0);
+    return (nch > 33 && nch < 47) || (nch > 58 && nch < 64) || (nch > 91 && nch < 96);
 }
 
 ///
@@ -148,13 +156,28 @@ const disks = {
                 ]
             }
         },
+        block: {
+            MustCalled: true,
+            MatchesOrder: true,
+            Matches: [
+                {
+                    type: 'mandatory',
+                    match: '{',
+                },
+                'inTag',
+                {
+                    type: 'mandatory',
+                    match: '}',
+                }
+            ]
+        },
         function: {
             MatchesOrder: true,
             Matches: [
                 {
                     type: 'optional',
                     match: function(ch, bag){
-                        if(isLetter(ch)){
+                        if(isAlpha(ch)){
                             var instr = bag.instruction.getInstr();
                             instr.check("functionName");
                             instr.functionName += ch;
@@ -164,14 +187,17 @@ const disks = {
 
                         return false;
                     }
-                }, 
+                },
+                'whitespace', 
                 {
                     type: 'mandatory',
                     match: '(',
                     action: function(){
                         return '.arguments'
                     }
-                }
+                },
+                'whitespace',
+                '!block'
             ],
             arguments: {
                 OnStart: function(bag){
@@ -182,7 +208,7 @@ const disks = {
                     {
                         type: 'mandatory',
                         match: function(ch, bag){
-                            if(isLetter(ch)){
+                            if(isAlpha(ch)){
                                 var instr = bag.instruction.getInstr();
                                 if(instr.name == "argument") 
                                     instr = instr.parent.newChild("argument");
@@ -226,16 +252,15 @@ const disks = {
 };
 
 function initDisks(disk=undefined){
-    if(!disk) disk = disks;
     for(var p in disk){
-        if(typeof disk[p] == 'object'){
+        if(p != '_parent' && typeof disk[p] == 'object'){
             disk[p]._parent = disk;
             initDisks(disk[p]);
         }
     }
 }
 
-initDisks();
+initDisks(disks);
 
 function Parser(bag, str, cbk){
     bag.httpBuffer = "";
@@ -248,15 +273,28 @@ function Parser(bag, str, cbk){
 
     function changeDisk(ret){
         if(ret){ 
-            if(ret[0]==46 && lastDiskStr)
-                ret = lastDiskStr+ret;
-
             var instr = bag.instruction.getInstr().insert(ret);
 
             var disk = ret;
             if(typeof ret == 'string'){
+                if(ret[0]=='.' && lastDiskStr)
+                    ret = lastDiskStr+ret;
+
                 disk = eval('disks.'+ret);
+
+                if(disk == undefined){
+                    //Search by parent
+                    disk = bag.disk;
+                    while(disk){
+                        if(disk[ret])
+                            break;
+                        disk = disk.parent;
+                    }
+                }
+
+                lastDiskStr = ret;
             }
+
             bag.disk = disk;
             instr._disk = disk;
 
@@ -265,9 +303,7 @@ function Parser(bag, str, cbk){
 
             diskIsOrdered = disk.MatchesOrder == true;
             if(diskIsOrdered)
-                instr._curOrder = 0;
-
-            lastDiskStr = ret;
+                instr._curOrder = 0;      
         }
     }
 
@@ -278,12 +314,34 @@ function Parser(bag, str, cbk){
         var nch = str[j];
         var ch = String.fromCharCode(nch);
 
-        var instr = bag.getInstr();
+        var instr = bag.instruction.getInstr();
         var curDisk; // I know, it's ugly
 
         function checkMatch(match){
             if(typeof match == 'string'){
-                changeDisk(instr.getDisk(match));
+                //Interpretate signals
+                var objMatch = {};
+                var i=0;
+                for(;i<match.length; i++){
+                    if(isSymbol(match[i])){
+                        switch(match[i]){
+                            case '!': 
+                                objMatch.type = "mandatory";
+                                break;
+                            case '>': 
+                                objMatch.type = "repeatable";
+                                break;
+                        }
+                    }
+                    else 
+                        break;
+                }
+                if(i>0){
+                    objMatch.match = match.substr(i, match.length-i);
+                    match = objMatch;
+                }
+                else
+                    changeDisk(instr.getDisk(match));
             }
             else if(typeof match.match == 'function'){
                 if(match.match(ch, bag)){                    
@@ -294,16 +352,17 @@ function Parser(bag, str, cbk){
                 }
             }
             else { // string
-                if(match.match[0]==nch){
+                if(match.match[0]==ch){
                     var validated = true;
                     for(var i=1; i<match.match.length; i++){
-                        if(match.match[i]!=str[j+i]){
+                        if(match.match[i] != String.fromCharCode(str[j+i])){
                             validated = false;
                             break;
                         }
                     }
 
                     if(validated){
+                        j += match.match.length;
                         if(match.action)
                             changeDisk(match.action(bag));
                         lastMatch = match;
@@ -315,7 +374,7 @@ function Parser(bag, str, cbk){
             ///
             /// Get back if instruction is finished
             ///
-            if(instr._disk == curDisk){
+            if(curDisk.parent && instr._disk == curDisk){
                 instr = instr.close();
                 evaluateDisk(instr._disk);
             }
@@ -328,6 +387,9 @@ function Parser(bag, str, cbk){
             var matches = disk;
 
             if(!Array.isArray(disk)){ 
+                if(disk == undefined)
+                    console.log("red");
+
                 matches = disk.Matches; 
             }
 
@@ -341,6 +403,29 @@ function Parser(bag, str, cbk){
                 while(pos>=0 && pos<matches.length){
                     var match = matches[pos];
 
+                    if(typeof match == 'string'){ //force match object for the ordered
+                        //Interpretate signals
+                        var objMatch = {type: 'optional'};
+                        var i=0;
+                        for(;i<match.length; i++){
+                            if(isSymbol(match[i])){
+                                switch(match[i]){
+                                    case 33: //!
+                                        objMatch.type = "mandatory";
+                                        break;
+                                    case 62: //>
+                                        objMatch.type = "repeatable";
+                                        break;
+                                }
+                            }
+                            else 
+                                break;
+                        }
+
+                        objMatch.match = match.substr(i, match.length-i);
+                        match = objMatch;
+                    }
+
                     if(checkMatch(match)) {
                         switch(match.type){
                             case 'repeat':
@@ -349,6 +434,9 @@ function Parser(bag, str, cbk){
 
                             case 'exit':
                                 changeDisk(instr.parent._disk);
+
+                            case 'repeatable':
+                                break;
 
                             default: 
                                 instr._curOrder++;
@@ -364,6 +452,7 @@ function Parser(bag, str, cbk){
                                 //todo: exception
                                 break;
 
+                            case 'repeatable':
                             case 'optional':
                                 pos++;
                                 break;
@@ -397,6 +486,8 @@ function Parser(bag, str, cbk){
         ///
         evaluateDisk(bag.disk);
     }
+
+    cbk(bag);
 }
 
 module.exports = Parser;
