@@ -1,4 +1,4 @@
 ciao
 <?
-function test(ciao)
+function test (ciao)
 ?>

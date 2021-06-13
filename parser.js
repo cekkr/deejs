@@ -41,13 +41,15 @@ class Instruction{
         var instr = new Instruction(name);
         instr.pos = pos;
         instr.parent = this;
+
+        this.instructions.push(instr);
         this.curInstr = instr;
         return instr;
     }
 
     check(property){
-        if(this.property==undefined)
-            this.property = "";
+        if(this[property]==undefined)
+            this[property] = "";
     }
 
     getDisk(name){
@@ -210,9 +212,7 @@ const disks = {
                         match: function(ch, bag){
                             if(isAlpha(ch)){
                                 var instr = bag.instruction.getInstr();
-                                if(instr.name == "argument") 
-                                    instr = instr.parent.newChild("argument");
-                                else 
+                                if(instr.name != "argument") 
                                     instr = instr.newChild("argument");
 
                                 //bag._curChild = instr;
@@ -235,6 +235,10 @@ const disks = {
                     {
                         type: 'repeat',
                         match: ',',
+                        action: function(bag){
+                            var instr = bag.instruction.getInstr();
+                            instr = instr.parent.newChild("argument");
+                        }
                     },
                     {
                         type: 'exit',
@@ -362,7 +366,7 @@ function Parser(bag, str, cbk){
                     }
 
                     if(validated){
-                        j += match.match.length;
+                        j += match.match.length-1;
                         if(match.action)
                             changeDisk(match.action(bag));
                         lastMatch = match;
@@ -388,7 +392,7 @@ function Parser(bag, str, cbk){
 
             if(!Array.isArray(disk)){ 
                 if(disk == undefined)
-                    console.log("red");
+                    console.log("red"); //fault
 
                 matches = disk.Matches; 
             }
@@ -400,6 +404,12 @@ function Parser(bag, str, cbk){
             }
             else if(diskIsOrdered){
                 var pos = instr._curOrder;
+                var refInstr = instr.parent;
+                while(pos == undefined && refInstr != undefined){
+                    pos = refInstr._curOrder;
+                    refInstr = refInstr.parent;
+                }
+
                 while(pos>=0 && pos<matches.length){
                     var match = matches[pos];
 
@@ -437,10 +447,6 @@ function Parser(bag, str, cbk){
 
                             case 'repeatable':
                                 break;
-
-                            default: 
-                                instr._curOrder++;
-                                break;
                         }
 
                         pos = -1;
@@ -460,6 +466,10 @@ function Parser(bag, str, cbk){
                             case 'repeat':
                                 pos = -1;
                                 instr._curOrder = 0;
+                                break;
+
+                            default: 
+                                instr._curOrder++;
                                 break;
                         }
                     }
