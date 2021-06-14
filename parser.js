@@ -35,7 +35,7 @@ class Instruction{
             return this;
     }
 
-    newChild(name){
+    newChild(name, isCurInstr=true){
         var pos = this.instructions.length;
         if(!name) name = pos;
         var instr = new Instruction(name);
@@ -43,7 +43,7 @@ class Instruction{
         instr.parent = this;
 
         this.instructions.push(instr);
-        this.curInstr = instr;
+        if(isCurInstr) this.curInstr = instr;
         return instr;
     }
 
@@ -90,7 +90,7 @@ function isWhitespace(nch){
 
 function isSymbol(nch){
     if(isNaN(nch)) nch = nch.charCodeAt(0);
-    return (nch > 33 && nch < 47) || (nch > 58 && nch < 64) || (nch > 91 && nch < 96);
+    return (nch >= 33 && nch <= 47) || (nch >= 58 && nch <= 64) || (nch >= 91 && nch <= 96);
 }
 
 ///
@@ -111,6 +111,7 @@ const disks = {
         }
     ],
     inTag:{ 
+        MatchesThrough: ['whitespace', 'separator'],
         Matches: [
             {
                 match: '?>',
@@ -130,13 +131,44 @@ const disks = {
                     return 'inTag.function';
                 }
             },
-            'whitespace'
+            'expression'
+            
         ],
         whitespace: {
+            Transparent: true,
             Matches: function(ch){
                 return isWhitespace(ch);
-            },
-            Transparent: true
+            }
+        },
+        separator: {
+            Transparent: true,
+            Matches: function(ch){
+                return ch == ';';
+            }
+        },
+        expression: {
+            MatchesOrder: true,
+            Matches: [
+                'varDeclaration',
+                {
+                    type: 'mandatory',
+                    match: function(ch){
+                        return isAlpha(ch);
+                    }
+                }
+            ],
+            varDeclaration: {
+                Matches: [
+                    {
+                        match: ['var', 'let', 'const'],
+                        action: function(bag){
+                            var instr = bag.instruction.getInstr();
+                            instr = instr.insert('declaration');
+                            instr.type = bag.lastMatchString;
+                        }
+                    }
+                ]
+            }
         },
         value: {
             number: {
@@ -176,6 +208,7 @@ const disks = {
         },
         function: {
             MatchesOrder: true,
+            MatchesThrough: 'whitespace',
             Matches: [
                 {
                     type: 'optional',
@@ -190,8 +223,7 @@ const disks = {
 
                         return false;
                     }
-                },
-                'whitespace', 
+                }, 
                 {
                     type: 'mandatory',
                     match: '(',
@@ -199,7 +231,6 @@ const disks = {
                         return '.arguments'
                     }
                 },
-                'whitespace',
                 '!block'
             ],
             arguments: {
@@ -207,23 +238,32 @@ const disks = {
                     bag._argNum = 0;
                 },
                 MatchesOrder: true,
+                MatchesThrough: 'whitespace',
                 Matches: [
                     {
                         type: 'mandatory',
                         match: function(ch, bag){
-                            if(isAlpha(ch)){
-                                var instr = bag.instruction.getInstr();
-                                if(instr.name != "argument") 
-                                    instr = instr.newChild("argument");
+                            var instr = bag.instruction.getInstr();
+
+                            if(isAlpha(ch)){    
+                                if(!instr._curArg) 
+                                    instr._curArg = instr.newChild("argument", false);
 
                                 //bag._curChild = instr;
-                                instr.check("argName");
-                                instr.argName += ch;
-    
+                                instr._curArg.check("argName");
+                                instr._curArg.argName += ch;                                
+
                                 return true;
                             }
-    
+
+                            if(instr.name == "argument") 
+                                instr.close();
+
                             return false;
+                        },
+                        onClose: function(bag){
+                            var instr = bag.instruction.getInstr();
+                            instr._curArg = undefined;
                         }
                     },
                     {
@@ -237,8 +277,8 @@ const disks = {
                         type: 'repeat',
                         match: ',',
                         action: function(bag){
-                            var instr = bag.instruction.getInstr();
-                            instr = instr.parent.newChild("argument");
+                            /*var instr = bag.instruction.getInstr();
+                            instr = instr.parent.newChild("argument");*/
                         }
                     },
                     {
@@ -272,7 +312,6 @@ function Parser(bag, str, cbk){
     bag.instruction = new Instruction();
     bag.args = [];
 
-    var lastMatch;
     var lastDiskStr;
     var diskIsOrdered = false;
 
@@ -313,7 +352,7 @@ function Parser(bag, str, cbk){
 
             diskIsOrdered = disk.MatchesOrder == true;
             if(diskIsOrdered)
-                instr._curOrder = 0;      
+                instr._curOrder = instr._curOrder || 0;      
         }
     }
 
@@ -328,9 +367,14 @@ function Parser(bag, str, cbk){
         var curDisk; // I know, it's ugly
 
         function checkMatch(match){
+            if(match == undefined){
+                return false;
+            }
+
             if(typeof match == 'string'){
-                //Interpretate signals
-                var objMatch = {};
+                //Interpretate signals (are always referred to other symbols)
+                var objMatch = {type: "optional"};
+                var isString = false;
                 var i=0;
                 for(;i<match.length; i++){
                     if(isSymbol(match[i])){
@@ -341,50 +385,93 @@ function Parser(bag, str, cbk){
                             case '>': 
                                 objMatch.type = "repeatable";
                                 break;
+                            case '?':
+                                objMatch.type = 'optional'; //automatic
+                                break;
+                            case '=':
+                                isString = true;
+                                break;
                         }
                     }
                     else 
                         break;
                 }
-                if(i>0){
-                    objMatch.match = match.substr(i, match.length-i);
+
+                var toMatch = match.substr(i, match.length-i);
+
+                if(isString)
+                    objMatch.match = toMatch;
+                else
+                    objMatch.RefMatch = toMatch;
+
+                match = objMatch;
+
+                /*if(i>0){ //to think a little better
+                    objMatch.RefMatch = match.substr(i, match.length-i);
                     match = objMatch;
                 }
                 else
-                    changeDisk(instr.getDisk(match));
+                    changeDisk(instr.getDisk(match));*/
             }
-            else if(match.RefMatch){
+            
+            if(match.RefMatch){
                 var disk = curDisk._parent;
                 while(disk && !disk[match.RefMatch]){
                     disk = disk._parent;
                 }
-                if(disk)
-                    checkMatch(disk);
+                if(disk){
+                    var tmpDisk = disk[match.RefMatch];
+                    changeDisk(tmpDisk);
+                    evaluateDisk(tmpDisk);
+                } else {
+                    //todo: error parser composition
+                }
             }
             else if(typeof match.match == 'function'){
                 if(match.match(ch, bag)){                    
-                    if(match.action) 
+                    if(match.action){
                         changeDisk(match.action(bag));
+                        instr._curOrder++;
+                    }
                     lastMatch = match;
                     return true;
                 }
             }
-            else { // string
-                if(match.match[0]==ch){
-                    var validated = true;
-                    for(var i=1; i<match.match.length; i++){
-                        if(match.match[i] != String.fromCharCode(str[j+i])){
-                            validated = false;
-                            break;
-                        }
-                    }
+            else { // array[string]
+                if(!Array.isArray(match.match))
+                    match.match = [match.match];
 
-                    if(validated){
-                        j += match.match.length-1;
-                        if(match.action)
-                            changeDisk(match.action(bag));
-                        lastMatch = match;
-                        return true;
+                for(var matchMatch of match.match){
+                    if(matchMatch && matchMatch[0]==ch){
+                        var validated = true;
+                        for(var i=1; i<matchMatch.length; i++){
+                            if(matchMatch[i] != String.fromCharCode(str[j+i])){
+                                validated = false;
+                                break;
+                            }
+                        }
+
+                        if(validated){
+                            bag.lastMatchString = matchMatch;
+
+                            j += matchMatch.length-1;
+
+                            if(match.action){
+                                changeDisk(match.action(bag));
+                                instr._curOrder++;
+                            }
+
+                            if(match.type){
+                                switch(match.type){
+                                    case 'exit':
+                                        changeDisk(instr._disk);
+                                        break;
+                                }
+                            }
+
+                            lastMatch = match;
+                            return true;
+                        }
                     }
                 }
             }
@@ -403,6 +490,7 @@ function Parser(bag, str, cbk){
         function evaluateDisk(disk){
             curDisk = disk;
             var matches = disk;
+            instr = bag.instruction.getInstr();
 
             if(!Array.isArray(disk)){ 
                 if(disk == undefined)
@@ -411,6 +499,9 @@ function Parser(bag, str, cbk){
                 matches = disk.Matches; 
             }
 
+            if(!Array.isArray(matches))
+                matches = [matches];
+
             if(matches == undefined){
                 for(var p in disk){
                     checkMatch(disk[p]);
@@ -418,10 +509,21 @@ function Parser(bag, str, cbk){
             }
             else if(diskIsOrdered){
                 var pos = instr._curOrder;
-                var refInstr = instr.parent;
+                /*var refInstr = instr;
                 while(pos == undefined && refInstr != undefined){
-                    pos = refInstr._curOrder;
                     refInstr = refInstr.parent;
+                    pos = refInstr._curOrder;
+                }*/
+
+                // Check through
+                if(disk.MatchesThrough){
+                    if(!Array.isArray(disk.MatchesThrough))
+                        disk.MatchesThrough = [disk.MatchesThrough];
+
+                    for(var i in disk.MatchesThrough){
+                        if(checkMatch(disk.MatchesThrough[i]))
+                            return;
+                    }
                 }
 
                 while(pos>=0 && pos<matches.length){
@@ -434,10 +536,10 @@ function Parser(bag, str, cbk){
                         for(;i<match.length; i++){
                             if(isSymbol(match[i])){
                                 switch(match[i]){
-                                    case 33: //!
+                                    case '!': 
                                         objMatch.type = "mandatory";
                                         break;
-                                    case 62: //>
+                                    case '>': 
                                         objMatch.type = "repeatable";
                                         break;
                                 }
@@ -451,13 +553,16 @@ function Parser(bag, str, cbk){
                     }
 
                     if(checkMatch(match)) {
+                        bag._curMatchConfirmed = match;
+
                         switch(match.type){
                             case 'repeat':
                                 instr._curOrder = 0;
                                 break;
 
                             case 'exit':
-                                changeDisk(instr.parent._disk);
+                                var oldDisk = instr.close()._disk;
+                                changeDisk(oldDisk);
 
                             case 'repeatable':
                                 break;
@@ -466,25 +571,37 @@ function Parser(bag, str, cbk){
                         pos = -1;
                     }
                     else {
-                        switch(match.type){
-                            case 'mandatory':
-                                pos = -1;
-                                //todo: exception
-                                break;
+                        if(bag._curMatchConfirmed == match){
+                            //end of match
+                            instr._curOrder = ++pos;
+                            bag._curMatchConfirmed = undefined;
 
-                            case 'repeatable':
-                            case 'optional':
-                                pos++;
-                                break;
+                            if(match.onClose) 
+                                match.onClose(bag);
+                        }
+                        else {
+                            switch(match.type){
+                                case 'mandatory':
+                                    pos = -1;
+                                    //todo: exception
+                                    break;
 
-                            case 'repeat':
-                                pos = -1;
-                                instr._curOrder = 0;
-                                break;
+                                case 'repeatable':
+                                case 'optional':
+                                    case 'repeat':
+                                    instr._curOrder = ++pos;
+                                    break;
 
-                            default: 
-                                instr._curOrder++;
-                                break;
+                                default: 
+                                    instr._curOrder++;
+                                    break;
+                            }
+
+                            if(instr._curOrder >= matches.length){
+                                // We are sorry but it's time to go
+                                instr = instr.close();
+                                evaluateDisk(instr._disk);
+                            }
                         }
                     }
                 }
@@ -513,5 +630,14 @@ function Parser(bag, str, cbk){
 
     cbk(bag);
 }
+
+process
+  .on('unhandledRejection', (reason, p) => {
+    console.error(reason, 'Unhandled Rejection at Promise', p);
+  })
+  .on('uncaughtException', err => {
+    console.error(err, 'Uncaught Exception thrown');
+    process.exit(1);
+  });
 
 module.exports = Parser;
