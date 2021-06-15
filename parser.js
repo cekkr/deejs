@@ -74,9 +74,14 @@ function isNumeric(nch){
     return  nch>=48&&nch<=57;
 }
 
+function isAlphaLowerCase(nch){
+    if(isNaN(nch)) nch = nch.charCodeAt(0);
+    return nch>=97&&nch<=122;
+}
+
 function isAlpha(nch){
     if(isNaN(nch)) nch = nch.charCodeAt(0);
-    return (nch>=65&&nch<=90)||(nch>=97&&nch<=122);
+    return (nch>=65&&nch<=90)||isAlphaLowerCase(nch);
 }
 
 function isAlphaNumeric(nch){
@@ -296,11 +301,15 @@ const disks = {
     }
 };
 
-function initDisks(disk=undefined){
+function initDisks(disk=undefined, name=''){
     for(var p in disk){
         if(p != '_parent' && typeof disk[p] == 'object'){
-            disk[p]._parent = disk;
-            initDisks(disk[p]);
+            if(isAlphaLowerCase(p[0])){
+                disk[p]._parent = disk;
+                var thisName = (name!=''?name+'.':'')+p;
+                disk[p].name = thisName;
+                initDisks(disk[p], thisName);
+            }
         }
     }
 }
@@ -336,16 +345,17 @@ function Parser(bag, str, cbk){
                     }
                 }
 
-                if(!disk.Transparent)
-                    instr = instr.insert(ret);
-
                 lastDiskStr = ret;
+            }
+
+            if(!disk.Transparent && instr._disk != disk){
+                instr = instr.insert(disk.name);
+                instr._disk = disk;
             }
 
             //todo: insert ad hoc instruction if disk is object
 
-            bag.disk = disk;
-            instr._disk = disk;
+            bag.disk = disk;            
 
             if(disk.OnStart) 
                 disk.OnStart(bag);
@@ -419,10 +429,14 @@ function Parser(bag, str, cbk){
                 while(disk && !disk[match.RefMatch]){
                     disk = disk._parent;
                 }
+
                 if(disk){
+                    var prevDisk = curDisk;
                     var tmpDisk = disk[match.RefMatch];
                     changeDisk(tmpDisk);
-                    evaluateDisk(tmpDisk);
+                    var res = evaluateDisk(tmpDisk);
+                    changeDisk(prevDisk);
+                    return res;
                 } else {
                     //todo: error parser composition
                 }
@@ -522,7 +536,7 @@ function Parser(bag, str, cbk){
 
                     for(var i in disk.MatchesThrough){
                         if(checkMatch(disk.MatchesThrough[i]))
-                            return;
+                            return true;
                     }
                 }
 
@@ -568,7 +582,7 @@ function Parser(bag, str, cbk){
                                 break;
                         }
 
-                        pos = -1;
+                        return true;
                     }
                     else {
                         if(bag._curMatchConfirmed == match){
@@ -611,15 +625,19 @@ function Parser(bag, str, cbk){
                 }
             }
             else {
-                if(typeof matches == 'string'){
-                    checkMatch(match);
+                /*if(typeof matches == 'string'){
+                    if(checkMatch(match))
+                        return true;
                 }
-                else {
-                    for(var match of matches){
-                        checkMatch(match)
-                    }
-                }
+                else {*/
+
+                for(var match of matches){
+                    if(checkMatch(match))
+                        return true;
+                }  
             }
+
+            return false;
         }
 
         ///
