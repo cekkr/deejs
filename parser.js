@@ -378,7 +378,7 @@ function Parser(bag, str, cbk){
 
         function checkMatch(match){
             var instr = bag.instruction.getInstr();
-            
+
             if(match == undefined){
                 return false;
             }
@@ -514,7 +514,7 @@ function Parser(bag, str, cbk){
 
             if(!Array.isArray(disk)){ 
                 if(disk == undefined)
-                    console.log("red"); //fault
+                    console.log("disk fault"); //fault
 
                 matches = disk.Matches; 
             }
@@ -573,7 +573,11 @@ function Parser(bag, str, cbk){
                     }
 
                     if(checkMatch(match)) {
-                        bag._curMatchConfirmed = match;
+                        if(instr._curMatchConfirmed != undefined){
+                            console.log("to check");
+                        }
+
+                        instr._curMatchConfirmed = match;
 
                         switch(match.type){
                             case 'repeat':
@@ -592,10 +596,10 @@ function Parser(bag, str, cbk){
                         return true;
                     }
                     else {
-                        if(bag._curMatchConfirmed == match){
+                        if(instr._curMatchConfirmed == match){
                             //end of match
                             instr._curOrder = ++pos;
-                            bag._curMatchConfirmed = undefined;
+                            instr._curMatchConfirmed = undefined;
 
                             if(match.onClose) 
                                 match.onClose(bag);
