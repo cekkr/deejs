@@ -197,8 +197,9 @@ const disks = {
             }
         },
         block: {
-            MustCalled: true,
+            //MustCalled: true, //?
             MatchesOrder: true,
+            MatchesThrough: 'whitespace',
             Matches: [
                 {
                     type: 'mandatory',
@@ -372,11 +373,12 @@ function Parser(bag, str, cbk){
     for(; j<str.length; j++){
         var nch = str[j];
         var ch = String.fromCharCode(nch);
-
-        var instr = bag.instruction.getInstr();
+        
         var curDisk; // I know, it's ugly
 
         function checkMatch(match){
+            var instr = bag.instruction.getInstr();
+            
             if(match == undefined){
                 return false;
             }
@@ -502,9 +504,13 @@ function Parser(bag, str, cbk){
         }
 
         function evaluateDisk(disk){
+            if(disk.name.endsWith("block")){
+                console.log('debug');
+            }
+
             curDisk = disk;
             var matches = disk;
-            instr = bag.instruction.getInstr();
+            var instr = bag.instruction.getInstr();
 
             if(!Array.isArray(disk)){ 
                 if(disk == undefined)
@@ -579,6 +585,7 @@ function Parser(bag, str, cbk){
                                 changeDisk(oldDisk);
 
                             case 'repeatable':
+                                //todo(?)
                                 break;
                         }
 
