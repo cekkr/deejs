@@ -1,0 +1,5 @@
+Studio della sovrapposizione dei dischi e dei match:
+I match possono sovrapporsi fra di loro, fino ad essere confermato solo uno in particolare.
+L'engine del parser, quindi, deve valutare tutte le opzioni in contemporanea finchè il più probabile non verrà scelto
+Quindi deve esserci un indicatore di contemporaneità e di esclusione.
+Questo indicatore può essere messo nell'istruzione confermata come array

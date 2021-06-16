@@ -325,6 +325,9 @@ function Parser(bag, str, cbk){
     var lastDiskStr;
     var diskIsOrdered = false;
 
+    ///
+    /// Change Disk
+    ///
     function changeDisk(ret){
         if(ret){ 
             var instr = bag.instruction.getInstr();
@@ -369,13 +372,19 @@ function Parser(bag, str, cbk){
 
     changeDisk('root');
 
+    let point = ""; // debug purposes
+
     let j = 0;
     for(; j<str.length; j++){
         var nch = str[j];
         var ch = String.fromCharCode(nch);
-        
+        point += ch;
+
         var curDisk; // I know, it's ugly
 
+        ///
+        /// Check Match
+        ///
         function checkMatch(match){
             var instr = bag.instruction.getInstr();
 
@@ -403,6 +412,9 @@ function Parser(bag, str, cbk){
                             case '=':
                                 isString = true;
                                 break;
+                            case '"':
+                                objMatch.temporary = true;
+                                break;
                         }
                     }
                     else 
@@ -425,23 +437,29 @@ function Parser(bag, str, cbk){
                 else
                     changeDisk(instr.getDisk(match));*/
             }
-            
-            if(match.RefMatch){
-                var disk = curDisk._parent;
+
+            if(!match._disk && match.RefMatch){
+                var disk = instr._disk;
                 while(disk && !disk[match.RefMatch]){
                     disk = disk._parent;
                 }
 
                 if(disk){
-                    var prevDisk = curDisk;
-                    var tmpDisk = disk[match.RefMatch];
-                    changeDisk(tmpDisk);
-                    var res = evaluateDisk(tmpDisk);
-                    changeDisk(prevDisk);
-                    return res;
-                } else {
+                    match._disk = disk[match.RefMatch];    
+                }
+                else {
                     //todo: error parser composition
                 }
+            }
+            
+            if(match._disk){
+                var prevDisk = instr._disk;
+                var tmpDisk = match._disk;
+                changeDisk(tmpDisk);
+                var res = evaluateDisk(tmpDisk);
+                //if(match.temporary)
+                changeDisk(prevDisk);
+                return res;
             }
             else if(typeof match.match == 'function'){
                 if(match.match(ch, bag)){                    
@@ -503,10 +521,34 @@ function Parser(bag, str, cbk){
             return false;
         }
 
+        ///
+        /// Evaluate Disk
+        ///
         function evaluateDisk(disk){
+
+            ///
+            /// MANUAL DEBUG
+            ///
+
             if(disk.name.endsWith("block")){
                 console.log('debug');
             }
+
+            if(disk.name.endsWith("inTag")){
+                console.log('debug');
+            }
+
+            if(disk.name.endsWith("varDeclaration")){
+                console.log('debug');
+            }
+
+            if(disk.name.endsWith("expression")){
+                console.log('debug');
+            }
+
+            ///
+            /// END MANUAL DEBUG
+            ///
 
             curDisk = disk;
             var matches = disk;
@@ -541,7 +583,7 @@ function Parser(bag, str, cbk){
                         disk.MatchesThrough = [disk.MatchesThrough];
 
                     for(var i in disk.MatchesThrough){
-                        if(checkMatch(disk.MatchesThrough[i]))
+                        if(checkMatch('"'+disk.MatchesThrough[i]))
                             return true;
                     }
                 }
@@ -569,11 +611,12 @@ function Parser(bag, str, cbk){
                         }
 
                         objMatch.RefMatch = match.substr(i, match.length-i);
-                        match = objMatch;
+                        matches[pos] = match = objMatch;
                     }
 
-                    if(checkMatch(match)) {
-                        if(instr._curMatchConfirmed != undefined){
+                    var matchDisk = undefined;
+                    if(checkMatch(match._disk || match)) {
+                        if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
                             console.log("to check");
                         }
 
