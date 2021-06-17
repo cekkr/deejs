@@ -4,7 +4,7 @@ class Bag{
         this.path = path;
         this.solver = solver;
         this.req = req;
-        this.res = res;
+        this.res = res;        
 
         // Append vars
         this.vars = {};

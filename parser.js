@@ -326,6 +326,20 @@ function Parser(bag, str, cbk){
     var diskIsOrdered = false;
 
     ///
+    /// Parser Path 
+    ///
+    bag.parserPath = [];
+
+    function calcParserPath(){
+        var str = "";
+        for(var path of parserPath){
+            if(str) str += ".";
+            str += path;
+        }
+        return str;
+    }
+
+    ///
     /// Change Disk
     ///
     function changeDisk(ret){
@@ -366,13 +380,13 @@ function Parser(bag, str, cbk){
 
             diskIsOrdered = disk.MatchesOrder == true;
             if(diskIsOrdered)
-                instr._curOrder = instr._curOrder || 0;      
+                instr._curOrder = instr._curOrder || 0;   
+                
+            bag.parserPath.push([disk.name, disk]);
         }
     }
 
     changeDisk('root');
-
-    let point = ""; // debug purposes
 
     let j = 0;
     for(; j<str.length; j++){
@@ -569,6 +583,9 @@ function Parser(bag, str, cbk){
                     checkMatch(disk[p]);
                 }
             }
+            ///
+            /// Disk Ordered
+            ///
             else if(diskIsOrdered){
                 var pos = instr._curOrder;
                 /*var refInstr = instr;
@@ -590,6 +607,7 @@ function Parser(bag, str, cbk){
 
                 while(pos>=0 && pos<matches.length){
                     var match = matches[pos];
+                    bag.parserPath.push([pos, match]);
 
                     if(typeof match == 'string'){ //force match object for the ordered
                         //Interpretate signals
@@ -614,7 +632,7 @@ function Parser(bag, str, cbk){
                         matches[pos] = match = objMatch;
                     }
 
-                    var matchDisk = undefined;
+                    var matchDisk = undefined;                    
                     if(checkMatch(match._disk || match)) {
                         if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
                             console.log("to check");
@@ -639,6 +657,8 @@ function Parser(bag, str, cbk){
                         return true;
                     }
                     else {
+                        bag.parserPath.pop();
+
                         if(instr._curMatchConfirmed == match){
                             //end of match
                             instr._curOrder = ++pos;
@@ -665,11 +685,19 @@ function Parser(bag, str, cbk){
                                     break;
                             }
 
-                            if(instr._curOrder >= matches.length){
+                            ///
+                            /// Exit (if order ends or mandatory is wrong)
+                            ///
+                            if(instr._curOrder >= matches.length || pos == -1){
                                 // We are sorry but it's time to go
                                 instr = instr.close();
                                 evaluateDisk(instr._disk);
+                                bag.parserPath.pop();
+                                return true;
                             }
+
+                            // I love you <3 @naxheel
+
                         }
                     }
                 }
@@ -679,17 +707,18 @@ function Parser(bag, str, cbk){
                 }
             }
             else {
-                /*if(typeof matches == 'string'){
-                    if(checkMatch(match))
-                        return true;
-                }
-                else {*/
-
+                var i=0;
                 for(var match of matches){
-                    if(checkMatch(match))
+                    bag.parserPath.push([i++, match]);
+                    var ret = checkMatch(match);
+                    bag.parserPath.pop();
+
+                    if(ret)
                         return true;
                 }  
             }
+
+            //todo: No corrispondence, so delete the disk's instruction
 
             return false;
         }
