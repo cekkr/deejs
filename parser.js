@@ -308,7 +308,8 @@ function initDisks(disk=undefined, name=''){
             if(isAlphaLowerCase(p[0])){
                 disk[p]._parent = disk;
                 var thisName = (name!=''?name+'.':'')+p;
-                disk[p].name = thisName;
+                disk[p].Name = p;
+                disk[p].FullName = thisName;
                 initDisks(disk[p], thisName);
             }
         }
@@ -386,6 +387,33 @@ function Parser(bag, str, cbk){
         }
     }
 
+    ///
+    /// Exit Disk
+    ///
+    function exitDisk(){
+        var curDisk;
+        var nxtDisk;
+        for(var i=bag.parserPath.length-1; i>=0; i--){
+            var p = bag.parserPath[i];
+            if(typeof p === 'object'){
+                if(!curDisk){
+                    curDisk = p;
+                }
+                else {
+                    nxtDisk = p;
+                    break;
+                }
+
+                bag.parserPath.pop();
+            }
+        }
+
+        if(nxtDisk){
+            changeDisk(nxtDisk);
+            //evaluateDisk(); //?
+        }
+    }
+
     changeDisk('root');
 
     let j = 0;
@@ -443,13 +471,6 @@ function Parser(bag, str, cbk){
                     objMatch.RefMatch = toMatch;
 
                 match = objMatch;
-
-                /*if(i>0){ //to think a little better
-                    objMatch.RefMatch = match.substr(i, match.length-i);
-                    match = objMatch;
-                }
-                else
-                    changeDisk(instr.getDisk(match));*/
             }
 
             if(!match._disk && match.RefMatch){
@@ -469,8 +490,10 @@ function Parser(bag, str, cbk){
             if(match._disk){
                 var prevDisk = instr._disk;
                 var tmpDisk = match._disk;
+                bag.parserPath.push([p, tmpDisk]);
                 changeDisk(tmpDisk);
                 var res = evaluateDisk(tmpDisk);
+                bag.parserPath.pop();
                 //if(match.temporary)
                 changeDisk(prevDisk);
                 return res;
@@ -509,13 +532,7 @@ function Parser(bag, str, cbk){
                                 instr._curOrder++;
                             }
 
-                            if(match.type){
-                                switch(match.type){
-                                    case 'exit':
-                                        changeDisk(instr._disk);
-                                        break;
-                                }
-                            }
+                            // Ex if match.type == 'exit'
 
                             lastMatch = match;
                             return true;
@@ -527,10 +544,11 @@ function Parser(bag, str, cbk){
             ///
             /// Get back if instruction is finished
             ///
-            if(curDisk.parent && instr._disk == curDisk){
+            // Reflect about this
+            /*if(curDisk.parent && instr._disk == curDisk){
                 instr = instr.close();
                 evaluateDisk(instr._disk);
-            }
+            }*/
 
             return false;
         }
@@ -539,6 +557,8 @@ function Parser(bag, str, cbk){
         /// Evaluate Disk
         ///
         function evaluateDisk(disk){
+            if(!disk)
+                disk = bag.disk;
 
             ///
             /// MANUAL DEBUG
@@ -578,9 +598,14 @@ function Parser(bag, str, cbk){
             if(!Array.isArray(matches))
                 matches = [matches];
 
+            ///
+            /// Disks match (theoretical)
+            ///
             if(matches == undefined){
                 for(var p in disk){
+                    bag.parserPath.push([p, disk[p]]);
                     checkMatch(disk[p]);
+                    bag.parserPath.pop();
                 }
             }
             ///
@@ -691,9 +716,8 @@ function Parser(bag, str, cbk){
                             if(instr._curOrder >= matches.length || pos == -1){
                                 // We are sorry but it's time to go
                                 instr = instr.close();
-                                evaluateDisk(instr._disk);
-                                bag.parserPath.pop();
-                                return true;
+                                exitDisk();
+                                return evaluateDisk();
                             }
 
                             // I love you <3 @naxheel
@@ -706,15 +730,25 @@ function Parser(bag, str, cbk){
                     //todo: exception: excepted...
                 }
             }
+            ///
+            /// Unordered Matches
+            ///
             else {
                 var i=0;
                 for(var match of matches){
                     bag.parserPath.push([i++, match]);
                     var ret = checkMatch(match);
+
                     bag.parserPath.pop();
 
-                    if(ret)
+                    if(ret){
+                        // Exit type is possible just with unordered disk
+                        if(match.type == "exit"){
+                            exitDisk();                      
+                        }
+
                         return true;
+                    }
                 }  
             }
 
@@ -726,7 +760,7 @@ function Parser(bag, str, cbk){
         ///
         /// Evaluate current disk
         ///
-        evaluateDisk(bag.disk);
+        evaluateDisk();
     }
 
     cbk(bag);
