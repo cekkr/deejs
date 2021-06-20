@@ -431,7 +431,9 @@ function Parser(bag, str, cbk){
         var instr = instruction;
         instruction = instr.parent;
         delete instr.parent[instr.path];
+
         //todo: remove from alivePaths
+        alivePath.splice(alivePath.indexOf(instr), 1);
     }
 
     function confirmInstruction(){
