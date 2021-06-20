@@ -232,7 +232,7 @@ const disks = {
                     type: 'optional',
                     match: function(ch, bag){
                         if(isAlpha(ch)){
-                            var instr = bag.instruction.getInstr();
+                            var instr = instruction;
                             instr.check("functionName");
                             instr.functionName += ch;
 
@@ -328,8 +328,7 @@ function initDisks(disk=undefined, name=''){
     }
 }
 
-function isDiskOrdered(disk){
-    var mainDisk = disk;
+function getDiskEnsured(disk){
     var instr = instruction;
 
     var topDisk;
@@ -344,7 +343,11 @@ function isDiskOrdered(disk){
         disk = disk._parent;
     }
 
-    return topDisk == mainDisk;
+    return topDisk;
+}
+
+function isDiskOrdered(disk){
+    return getDiskEnsured(disk) == disk;
 }
 
 initDisks(disks);
@@ -416,9 +419,10 @@ function Parser(bag, str, cbk){
             cInst.isMatch = !isNaN(lastPath);
             cInst.obj = lastObj;
 
-            if(cInst.isMatch) alivePath.push(cInst);
+            if(cInst.isMatch) 
+                alivePath.push(cInst);
         }
-        else if(Object.keys(cInst).length>0){
+        else if(Object.keys(cInst.pathInstructions).length>0){
             // You should close completed actions
             //todo
             console.log("todo");
@@ -438,7 +442,13 @@ function Parser(bag, str, cbk){
 
     function confirmInstruction(){
         console.log("check", instruction);
-        //todo: remove from alivePaths (?)
+        //alivePath.splice(alivePath.indexOf(instruction), 1);
+
+        /*var instr = instruction;
+        var prev = instruction.close();
+        var disk = prev.getParentDisk();
+        prev.instructions.push(instr);
+        ch angeDisk(disk); //it has a sense?*/
     }
 
     ///
@@ -819,6 +829,7 @@ function Parser(bag, str, cbk){
 
                 if(pos == matches.length){
                     //todo: exception: excepted...
+                    console.error("Ordered match exception")
                 }
             }
             ///
@@ -864,7 +875,7 @@ function Parser(bag, str, cbk){
         /// Evaluate alivePath
         ///
         for (var path of alivePath){
-            console.log("todo", path.path);
+            console.log("todo", path);
         }
 
     }
