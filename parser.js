@@ -431,10 +431,12 @@ function Parser(bag, str, cbk){
         var instr = instruction;
         instruction = instr.parent;
         delete instr.parent[instr.path];
+        //todo: remove from alivePaths
     }
 
     function confirmInstruction(){
         console.log("check", instruction);
+        //todo: remove from alivePaths (?)
     }
 
     ///
