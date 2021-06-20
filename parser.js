@@ -368,7 +368,7 @@ function Parser(bag, str, cbk){
     ///
     /// Select instruction
     ///
-    //var aliveInstructions = []; //(?)
+    var alivePath = []; //(?)
     function selectInstruction(){
         var tPath = "";
         var lastPath;
@@ -397,7 +397,7 @@ function Parser(bag, str, cbk){
             cInst.isMatch = !isNaN(lastPath);
             cInst.obj = lastObj;
 
-            //if(cInst.isMatch) aliveInstructions.push(cInst);
+            if(cInst.isMatch) alivePath.push(cInst);
         }
         else if(Object.keys(cInst).length>0){
             // You should close completed actions
@@ -838,9 +838,13 @@ function Parser(bag, str, cbk){
         }
 
         ///
-        /// Evaluate current disk
+        /// Evaluate current disk (looking for new ways)
         ///
         evaluateDisk();
+
+        ///
+        /// Evaluate alivePath
+        ///
 
     }
 
