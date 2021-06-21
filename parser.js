@@ -685,16 +685,19 @@ function Parser(bag, str, cbk){
                 disk = bag.disk;
 
                 //this is the automatic path
-                bag.generalDisk = disk;
+                //bag.generalDisk = disk;
             }
 
             curDisk = disk;
+            
+            if(disk.name == "function")
+                console.log("debug");
+            console.log(disk.name);
+
             var matches = disk;
 
             //var instr = bag.instruction.getInstr();
             var instr = instruction;
-            if(!instr)
-                console.log("debug");
             instr._curOrder = instr._curOrder || 0; // temporary
 
             if(!Array.isArray(disk)){ 
@@ -737,6 +740,12 @@ function Parser(bag, str, cbk){
                         if(checkMatch('"'+disk.MatchesThrough[i]))
                             return true;
                     }
+                }
+
+                function exit(){
+                    instruction.completed = true;
+                    exitDisk();
+                    return evaluateDisk();
                 }
 
                 while(pos>=0 && pos<matches.length){
@@ -838,9 +847,7 @@ function Parser(bag, str, cbk){
                             if(instr._curOrder >= matches.length){
                                 // We are sorry but it's time to go
                                 //instr = instr.close();
-                                instruction.completed = true;
-                                exitDisk();
-                                return evaluateDisk();
+                                return exit();
                             }
 
                             // I love you <3 @naxheel
@@ -849,9 +856,11 @@ function Parser(bag, str, cbk){
                     }
                 }
 
-                if(pos == matches.length){
+                if(pos >= matches.length){
                     //todo: exception: excepted...
-                    console.error("Ordered match exception")
+                    destroyInstruction();
+
+                    return exit();
                 }
             }
             ///
