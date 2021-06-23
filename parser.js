@@ -256,6 +256,10 @@ const disks = {
                 OnStart: function(bag){
                     bag._argNum = 0;
                 },
+                OnExit: function(bag){
+                    //debug purposes
+                    console.log("argument exit");
+                },
                 MatchesOrder: true,
                 MatchesThrough: 'whitespace',
                 Matches: [
@@ -379,12 +383,23 @@ function Parser(bag, str, cbk){
     /// ParserPathPop
     ///
     function parserPathPop(what){
-        while(true){
-            var path = bag.parserPath.pop();
-            if(path[0]=="inTag")
-                console.log("stop");
-            if(path[1]==what)
+        var go = false;
+        for(var ppath of bag.parserPath){
+            if(ppath[1]==what){
+                go = true;
                 break;
+            }
+        }
+
+        if(!go){
+            console.log("stop");
+        }
+        else {
+            while(true){
+                var path = bag.parserPath.pop();
+                if(path[1]==what)
+                    break;
+            }
         }
     }
 
@@ -542,6 +557,7 @@ function Parser(bag, str, cbk){
     for(; j<str.length; j++){
         var nch = str[j];
         var ch = String.fromCharCode(nch);
+        console.log('ch', ch);
 
         ///
         /// Check Match
@@ -743,17 +759,23 @@ function Parser(bag, str, cbk){
                 }
 
                 function exit(){
+                    if(disk.OnExit)
+                        disk.OnExit();
+
                     instruction.completed = true;
                     exitDisk();
                     return evaluateDisk();
                 }
 
+                if(ch == '{')
+                    console.log('debug');
+
                 while(pos>=0 && pos<matches.length){
                     var match = matches[pos];
 
-                    parserPathPush(pos, match);
-                    selectInstruction();
-
+                    ///
+                    /// Elaborate contracted match
+                    ///
                     if(typeof match == 'string'){ //force match object for the ordered
                         //Interpretate signals
                         var objMatch = {type: 'optional'};
@@ -777,6 +799,12 @@ function Parser(bag, str, cbk){
                         matches[pos] = match = objMatch;
                     }
 
+                    ///
+                    /// Go go go!
+                    ///
+                    parserPathPush(pos, match);
+                    selectInstruction();
+
                     var matchDisk = undefined;                    
                     if(checkMatch(match._disk || match)) {
                         if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
@@ -791,8 +819,9 @@ function Parser(bag, str, cbk){
                                 break;
 
                             case 'exit':
-                                var oldDisk = instr.close()._disk;
-                                changeDisk(oldDisk);
+                                /*var oldDisk = instr.close()._disk;
+                                changeDisk(oldDisk); */
+                                exit();
 
                             case 'repeatable':
                                 //todo(?)
