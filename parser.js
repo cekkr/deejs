@@ -469,6 +469,10 @@ function Parser(bag, str, cbk){
 
         //todo: remove from alivePaths
         alivePath.splice(alivePath.indexOf(instr), 1);
+
+        console.log("debug: instruction destroyed", instr);
+        if(instr.name=="function")
+            console.log("debug");
     }
 
     function confirmInstruction(){
@@ -746,6 +750,10 @@ function Parser(bag, str, cbk){
                     refInstr = refInstr.parent;
                     pos = refInstr._curOrder;
                 }*/
+
+                //todo: guarda perchè non accetta whitespace in function
+                if(instr.name == "function" && ch==' ')
+                    console.log("debug");
 
                 // Check through
                 if(disk.MatchesThrough){
