@@ -352,7 +352,7 @@ function getDiskEnsured(disk){
     return topDisk;
 }
 
-function isDiskOrdered(disk){
+function isDiskUnconfirmed(disk){
     return getDiskEnsured(disk) == disk;
 }
 
@@ -477,7 +477,7 @@ function Parser(bag, str, cbk){
     }
 
     function confirmInstruction(){
-        console.log("check", instruction);
+        console.log("confirm", instruction);
         instruction.parent.instructions.push(instruction);
         //alivePath.splice(alivePath.indexOf(instruction), 1);
 
@@ -533,8 +533,8 @@ function Parser(bag, str, cbk){
             if(diskIsOrdered)
                 instr._curOrder = instr._curOrder || 0;   
 
-            if(isDiskOrdered(disk))
-                bag.disk = disk;   
+            if(isDiskUnconfirmed(disk))
+                bag.disk = disk;  //todo: check base level for calculate branching
 
         }
     }
