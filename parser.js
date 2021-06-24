@@ -97,6 +97,7 @@ function isAlphaNumeric(nch){
 }
 
 function isWhitespace(nch){
+    if(nch == ' ' || nch == '\t') return true; //la situazione sta diventando ridicola...
     if(isNaN(nch)) nch = nch.charCodeAt(0);
     return nch == 32 || nch == 9;
 }
@@ -546,8 +547,10 @@ function Parser(bag, str, cbk){
         //or better select it from parsePath?
         var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
 
-        parserPathPop(curDisk);
-        selectInstruction();
+        if(!curDisk.Transparent){
+            parserPathPop(curDisk);
+            selectInstruction();
+        }
 
         if(nxtDisk){
             changeDisk(nxtDisk);
@@ -612,15 +615,21 @@ function Parser(bag, str, cbk){
 
                 match = objMatch;
             }
+            else if(typeof match == 'function'){
+                match = {match: match}; //uhm...
+            }
 
             if(!match._disk && match.RefMatch){
-                var disk = instr._disk;
+                var disk = instr.disk;
                 while(disk && !disk[match.RefMatch]){
                     disk = disk._parent;
                 }
 
+                if(disk && disk[match.RefMatch])
+                    disk = disk[match.RefMatch];
+
                 if(disk){
-                    match._disk = disk[match.RefMatch];    
+                    match._disk = disk;    
                 }
                 else {
                     //todo: error parser composition
@@ -628,7 +637,7 @@ function Parser(bag, str, cbk){
             }
             
             if(match._disk){
-                var prevDisk = instr._disk;
+                //var prevDisk = instr.disk;
                 var tmpDisk = match._disk;
 
                 parserPathPush(tmpDisk.name, tmpDisk);
@@ -924,9 +933,10 @@ function Parser(bag, str, cbk){
                     if(ret){
                         // Exit type is possible just with unordered disk
                         if(match.type == "exit"){
-                            exitDisk();
-                            return true;                      
-                        }                        
+                            exitDisk();                                             
+                        }              
+                        
+                        return true; 
                     }
                 }  
             }
