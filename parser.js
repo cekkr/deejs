@@ -31,9 +31,9 @@ class Instruction{
     }
 
     getParentDisk(){
-        if(this.parent.isMatch)
+        if(this.isMatch)
             return this.parent.getParentDisk();
-        return this.parent;
+        return this.disk;
     }
 
     getInstr(){
@@ -336,23 +336,25 @@ function initDisks(disk=undefined, name=''){
 
 function getDiskEnsured(disk){
     var instr = instruction;
+    if(!instr)
+        return disk;
 
-    var topDisk;
-    while(disk != null){
+    var topDisk = instr.getParentDisk();
+    while(instr != null && disk != null){
 
-        if(disk.MatchesOrder == true && instr.completed == false)
+        if((disk.MatchesOrder && !instr.completed) || disk.Transparent)
             topDisk = undefined;
         else if(topDisk == undefined) 
             topDisk = disk;
 
         instr = instr.parent;
-        disk = disk._parent;
+        disk = instr.getParentDisk();
     }
 
     return topDisk;
 }
 
-function isDiskUnconfirmed(disk){
+function isDiskConfirmed(disk){
     return getDiskEnsured(disk) == disk;
 }
 
@@ -402,6 +404,8 @@ function Parser(bag, str, cbk){
                     break;
             }
         }
+
+        selectInstruction();
     }
 
     function parserPathPush(name, what){
@@ -410,8 +414,21 @@ function Parser(bag, str, cbk){
                 return false;
         }
 
-        bag.parserPath.push([name, what]);
+        var arr = [name, what];
+        bag.parserPath.push(arr);
+
+        selectInstruction();
+        arr.push(instruction);
+
         return true;
+    }
+
+    function getParserPath(){
+        var n = bag.parserPath.length;
+        if(n == 0) 
+            return undefined;
+
+        return bag.parserPath[n-1];
     }
 
     ///
@@ -446,9 +463,9 @@ function Parser(bag, str, cbk){
             cInst.isMatch = !isNaN(lastPath);
             cInst.obj = lastObj;
 
-            if(cInst.isMatch){ 
+            /*if(cInst.isMatch){ 
                 alivePath.push(cInst);
-            }
+            }*/
             
             while(parent != null && parent.isMatch)
                     parent = parent.top;
@@ -476,9 +493,36 @@ function Parser(bag, str, cbk){
             console.log("debug");
     }
 
+    function instructionIsInsideBagDisk(){
+        var instr = instruction;
+        var disk = bag.disk;
+        var compDisk = instr.disk;
+
+        if(compDisk == disk)
+            return false;
+
+        while(compDisk){
+            if(compDisk == disk)
+                return true;
+            compDisk = compDisk._parent;
+        }
+        return false;
+    }
+
     function confirmInstruction(){
         console.log("confirm", instruction);
         instruction.parent.instructions.push(instruction);
+
+        if(instructionIsInsideBagDisk()){
+            var pp = getParserPath();
+            alivePath.push(pp);            
+        }
+        else {
+            var pp = getParserPath();
+            changeDisk(pp[1]);
+            console.log("check that");
+        }
+
         //alivePath.splice(alivePath.indexOf(instruction), 1);
 
         /*var instr = instruction;
@@ -516,11 +560,15 @@ function Parser(bag, str, cbk){
                 lastDiskStr = ret;
             }
 
+            if(isDiskConfirmed(disk)){
+                bag.disk = disk;  
+                console.log('debug: bag.disk', disk);
+            }
+
             if(!disk.Transparent /*&& instr._disk != disk*/){
                 /*instr = instr.insert(disk.name);
                 instr._disk = disk;*/
                 parserPathPush(disk.name, disk);                
-                selectInstruction();
                 instruction.disk = disk;
             }
 
@@ -533,9 +581,6 @@ function Parser(bag, str, cbk){
             if(diskIsOrdered)
                 instr._curOrder = instr._curOrder || 0;   
 
-            if(isDiskUnconfirmed(disk))
-                bag.disk = disk;  //todo: check base level for calculate branching
-
         }
     }
 
@@ -543,13 +588,12 @@ function Parser(bag, str, cbk){
     /// Exit Disk
     ///
     function exitDisk(){
-        var curDisk = bag.disk;
+        var curDisk = instruction.disk;
         //or better select it from parsePath?
         var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
 
         if(!curDisk.Transparent){
             parserPathPop(curDisk);
-            selectInstruction();
         }
 
         if(nxtDisk){
@@ -820,7 +864,6 @@ function Parser(bag, str, cbk){
                     /// Go go go!
                     ///
                     parserPathPush(pos, match);
-                    selectInstruction();
 
                     var matchDisk = undefined;                    
                     if(checkMatch(match._disk || match)) {
@@ -883,7 +926,6 @@ function Parser(bag, str, cbk){
                             ///
 
                             parserPathPop(match);                       
-                            selectInstruction();
 
                             if(pos == -1){
                                 destroyInstruction();
@@ -916,7 +958,6 @@ function Parser(bag, str, cbk){
                 var i=0;
                 for(var match of matches){
                     parserPathPush(i++, match);
-                    selectInstruction();
 
                     var ret = checkMatch(match);
 
@@ -926,9 +967,7 @@ function Parser(bag, str, cbk){
                     else {
                         destroyInstruction();
                         parserPathPop(match);
-                    }
-                    
-                    selectInstruction();
+                    }        
 
                     if(ret){
                         // Exit type is possible just with unordered disk
