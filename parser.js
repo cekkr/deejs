@@ -408,13 +408,19 @@ function Parser(bag, str, cbk){
         selectInstruction();
     }
 
-    function parserPathPush(name, what, pos=-1){
+    function parserPathPush(name, what=-1, pos=-1){
         for(var pp of bag.parserPath){
             if(pp[1]==what) 
                 return false;
         }
 
         var arr = [name];
+
+        if(name.constructor.name == "Instruction"){
+            pos = what;
+            what = name;
+            name = what.name;
+        }
 
         if(what.constructor.name == "Instruction")
             arr.push(what.obj);
@@ -449,37 +455,6 @@ function Parser(bag, str, cbk){
             return undefined;
 
         return bag.parserPath[n-1];
-    }
-
-    function forkParserPath(instr){
-        instruction = instr;
-
-        var path = instr.path;
-        var paths = path.split('.');
-        
-        var baseInstr = bag.instruction;
-        var curInstr = baseInstr;
-
-        var p = 0;
-        for(;p<paths.length; p++){
-            var pp = paths[p];
-            var newInstr = curInstr.pathInstructions[pp];
-
-            if(!newInstr)
-                break;
-
-            curInstr = newInstr;
-        }
-
-        while(instr != curInstr){
-            parserPathPush(instr.name, instr, p);
-            instr = instr.parent;
-        }
-
-        // Select disk
-        var disk = instruction.getParentDisk();
-        changeDisk(disk);
-        evaluateDisk(disk);
     }
 
     ///
@@ -1042,6 +1017,49 @@ function Parser(bag, str, cbk){
         evaluateDisk();
 
         ///
+        /// forkToInstruction
+        ///
+        function forkToInstruction(instr){
+            instruction = instr;
+    
+            var disk = instruction.getParentDisk();
+    
+            var path = instr.path;
+            var paths = path.split('.');
+            
+            var baseInstr = bag.instruction;
+            var curInstr = baseInstr;
+    
+            var p = 0;
+            for(;p<paths.length; p++){
+                var pp = paths[p];
+                var newInstr = curInstr.pathInstructions[pp];
+    
+                if(!newInstr)
+                    break;
+    
+                curInstr = newInstr;
+            }
+    
+            while(instr.getParentDisk() != disk)
+                instr = instr.parent;
+    
+            while(instr != curInstr){
+                parserPathPush(instr, p);
+                instr = instr.parent;
+            }
+    
+            // Select disk
+            changeDisk(disk);
+            if(instruction.isMath){
+                parserPathPush(instruction);
+                return checkMatch(instruction);
+            }
+            else 
+                return evaluateDisk(disk);
+        }
+
+        ///
         /// Function: mountInstruction
         /// queste funzioni messe un po' a cazzo di cane...
         function mountInstruction(instr){
@@ -1049,21 +1067,24 @@ function Parser(bag, str, cbk){
             var curParserPath = Utils.copyInNewObject(bag.parserPath);
             var curDisk = bag.disk;
 
-            instruction = instr;
-            forkParserPath(instruction);
+            var res = forkToInstruction(instruction);
 
             instruction = curInstr;
             bag.parserPath = curParserPath;
             bag.disk = curDisk;
+
+            return res;
         }
 
         ///
         /// Evaluate alivePath
         ///
-        for (var path of alivePath){
-            console.log("todo", path);
+        for (var p in alivePath){
+            var path = alivePath[p];
+            console.log("Concurrent instruction", path);
             var instr = path[2];
-            mountInstruction(instr);
+            if(!mountInstruction(instr))
+                alivePath.splice(p, 1);
         }
 
     }
