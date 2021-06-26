@@ -60,17 +60,14 @@ class Instruction{
             this[property] = "";
     }
 
-    getDisk(name){
-        if(this[name] !== undefined)
-            return this[name];
-        else if(this.parent !== undefined)
-            return this.parent.getDisk(name);
-        return null; //or get error
-    }
-
     close(){
         this.parent.curInstr = undefined;
         return this.parent;
+    }
+
+    isToComplete(){
+        var disk = getParentDisk();
+        return (disk.MatchesOrder && !instr.completed) || disk.Transparent
     }
 }
 
@@ -342,7 +339,7 @@ function getDiskEnsured(disk){
     var topDisk = instr.getParentDisk();
     while(instr != null && disk != null){
 
-        if((disk.MatchesOrder && !instr.completed) || disk.Transparent)
+        if(instr.isToComplete())
             topDisk = undefined;
         else if(topDisk == undefined) 
             topDisk = disk;
@@ -1051,7 +1048,8 @@ function Parser(bag, str, cbk){
     
             // Select disk
             changeDisk(disk);
-            if(instruction.isMath){
+            if(instruction.isMatch){
+                console.log('debug: instruction isMatch');
                 parserPathPush(instruction);
                 return checkMatch(instruction);
             }
@@ -1067,7 +1065,7 @@ function Parser(bag, str, cbk){
             var curParserPath = Utils.copyInNewObject(bag.parserPath);
             var curDisk = bag.disk;
 
-            var res = forkToInstruction(instruction);
+            var res = forkToInstruction(instr);
 
             instruction = curInstr;
             bag.parserPath = curParserPath;
