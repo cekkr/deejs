@@ -408,27 +408,78 @@ function Parser(bag, str, cbk){
         selectInstruction();
     }
 
-    function parserPathPush(name, what){
+    function parserPathPush(name, what, pos=-1){
         for(var pp of bag.parserPath){
             if(pp[1]==what) 
                 return false;
         }
 
-        var arr = [name, what];
-        bag.parserPath.push(arr);
+        var arr = [name];
 
-        selectInstruction();
-        arr.push(instruction);
+        if(what.constructor.name == "Instruction")
+            arr.push(what.obj);
+        
+        arr.push(what);
+        
+        if(pos>=0){
+            var p=0;
+            var newArr = [];
+            for(;p<bag.parserPath.length; p++){
+                if(p>=pos)
+                    newArr.unshift(bag.parserPath.pop());
+            }
+
+            bag.parserPath.push(arr);
+            bag.parserPath.concat(newArr);
+        }
+        else 
+            bag.parserPath.push(arr);
+
+        if(arr.length<3){
+            selectInstruction();
+            arr.push(instruction);
+        }
 
         return true;
     }
 
-    function getParserPath(){
+    function getLastParserPath(){
         var n = bag.parserPath.length;
         if(n == 0) 
             return undefined;
 
         return bag.parserPath[n-1];
+    }
+
+    function forkParserPath(instr){
+        instruction = instr;
+
+        var path = instr.path;
+        var paths = path.split('.');
+        
+        var baseInstr = bag.instruction;
+        var curInstr = baseInstr;
+
+        var p = 0;
+        for(;p<paths.length; p++){
+            var pp = paths[p];
+            var newInstr = curInstr.pathInstructions[pp];
+
+            if(!newInstr)
+                break;
+
+            curInstr = newInstr;
+        }
+
+        while(instr != curInstr){
+            parserPathPush(instr.name, instr, p);
+            instr = instr.parent;
+        }
+
+        // Select disk
+        var disk = instruction.getParentDisk();
+        changeDisk(disk);
+        evaluateDisk(disk);
     }
 
     ///
@@ -474,7 +525,7 @@ function Parser(bag, str, cbk){
         else if(Object.keys(cInst.pathInstructions).length>0){
             // You should close completed actions
             //todo
-            console.log("todo");
+            //console.log("todo");
         }
         
         instruction = cInst;
@@ -514,11 +565,11 @@ function Parser(bag, str, cbk){
         instruction.parent.instructions.push(instruction);
 
         if(instructionIsInsideBagDisk()){
-            var pp = getParserPath();
+            var pp = getLastParserPath();
             alivePath.push(pp);            
         }
         else {
-            var pp = getParserPath();
+            var pp = getLastParserPath();
             changeDisk(pp[1]);
             console.log("check that");
         }
@@ -991,10 +1042,28 @@ function Parser(bag, str, cbk){
         evaluateDisk();
 
         ///
+        /// Function: mountInstruction
+        /// queste funzioni messe un po' a cazzo di cane...
+        function mountInstruction(instr){
+            var curInstr = instruction;
+            var curParserPath = Utils.copyInNewObject(bag.parserPath);
+            var curDisk = bag.disk;
+
+            instruction = instr;
+            forkParserPath(instruction);
+
+            instruction = curInstr;
+            bag.parserPath = curParserPath;
+            bag.disk = curDisk;
+        }
+
+        ///
         /// Evaluate alivePath
         ///
         for (var path of alivePath){
             console.log("todo", path);
+            var instr = path[2];
+            mountInstruction(instr);
         }
 
     }
