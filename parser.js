@@ -411,18 +411,24 @@ function Parser(bag, str, cbk){
                 return false;
         }
 
-        var arr = [name];
+        var instr;
 
         if(name.constructor.name == "Instruction"){
+            pos = what;
+            instr = name;
+            what = name.obj;
+            name = what.name;  
+        }
+        else if(name.constructor.name == "Object"){
             pos = what;
             what = name;
             name = what.name;
         }
 
-        if(what.constructor.name == "Instruction")
-            arr.push(what.obj);
-        
-        arr.push(what);
+        var arr = [name, what];
+
+        if(instr)
+            arr.push(instr);
         
         if(pos>=0){
             var p=0;
@@ -557,6 +563,33 @@ function Parser(bag, str, cbk){
     }
 
     ///
+    /// Ensure Object Disk
+    ///
+    function ensureObjectDisk(disk){
+        if(disk){
+            if(typeof disk == 'string'){
+                if(disk[0]=='.' && lastDiskStr)
+                    disk = lastDiskStr+ret;
+
+                disk = eval('disks.'+disk);
+
+                if(disk == undefined){
+                    //Search by parent
+                    disk = bag.disk;
+                    while(disk){
+                        if(disk[disk])
+                            break;
+                        disk = disk.parent;
+                    }
+                }
+
+                lastDiskStr = disk;
+                return disk;
+            }
+        }
+    }
+
+    ///
     /// Change Disk
     ///
     function changeDisk(ret){
@@ -564,25 +597,7 @@ function Parser(bag, str, cbk){
             //var instr = bag.instruction.getInstr();
             instr = instruction;
 
-            var disk = ret;
-            if(typeof ret == 'string'){
-                if(ret[0]=='.' && lastDiskStr)
-                    ret = lastDiskStr+ret;
-
-                disk = eval('disks.'+ret);
-
-                if(disk == undefined){
-                    //Search by parent
-                    disk = bag.disk;
-                    while(disk){
-                        if(disk[ret])
-                            break;
-                        disk = disk.parent;
-                    }
-                }
-
-                lastDiskStr = ret;
-            }
+            var disk = ensureObjectDisk(ret);
 
             if(isDiskConfirmed(disk)){
                 bag.disk = disk;  
@@ -605,6 +620,7 @@ function Parser(bag, str, cbk){
             if(diskIsOrdered)
                 instr._curOrder = instr._curOrder || 0;   
 
+            return disk;
         }
     }
 
@@ -637,6 +653,14 @@ function Parser(bag, str, cbk){
         ///
         /// Check Match
         ///
+        function updateMatchInstruction(disk){  
+            disk = ensureObjectDisk(disk);
+            parserPathPush(disk);
+            changeDisk(disk);
+            alivePath.push(instruction);
+            parserPathPop(disk);
+        }
+
         function checkMatch(match){
             //var instr = bag.instruction.getInstr();
             var instr = instruction;
@@ -719,10 +743,13 @@ function Parser(bag, str, cbk){
 
                 return res;
             }
+            ///
+            /// Normal matching
+            ///
             else if(typeof match.match == 'function'){
                 if(match.match(ch, bag)){                    
                     if(match.action){
-                        changeDisk(match.action(bag));
+                        updateMatchInstruction(match.action(bag));
                         instr._curOrder++;
                     }
                     lastMatch = match;
@@ -749,7 +776,7 @@ function Parser(bag, str, cbk){
                             j += matchMatch.length-1;
 
                             if(match.action){
-                                changeDisk(match.action(bag));
+                                updateMatchInstruction(match.action(bag));
                                 instr._curOrder++;
                             }
 
