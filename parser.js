@@ -33,7 +33,7 @@ class Instruction{
     getParentDisk(){
         if(this.isMatch)
             return this.parent.getParentDisk();
-        return this.disk;
+        return this.obj || this.disk; //the last one is for security
     }
 
     getInstr(){
@@ -66,8 +66,8 @@ class Instruction{
     }
 
     isToComplete(){
-        var disk = getParentDisk();
-        return (disk.MatchesOrder && !instr.completed) || disk.Transparent
+        var disk = this.getParentDisk();
+        return (disk.MatchesOrder && !this.completed) || disk.Transparent
     }
 }
 
@@ -509,7 +509,8 @@ function Parser(bag, str, cbk){
         delete instr.top[instr.path];
 
         //todo: remove from alivePaths
-        alivePath.splice(alivePath.indexOf(instr), 1);
+        var pos = alivePath.indexOf(instr);
+        alivePath.splice(pos, 1);
 
         console.log("debug: instruction destroyed", instr);
         if(instr.name=="function")
@@ -611,7 +612,7 @@ function Parser(bag, str, cbk){
     /// Exit Disk
     ///
     function exitDisk(){
-        var curDisk = instruction.disk;
+        var curDisk = instruction.getParentDisk();
         //or better select it from parsePath?
         var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
 
@@ -1081,8 +1082,10 @@ function Parser(bag, str, cbk){
             var path = alivePath[p];
             console.log("Concurrent instruction", path);
             var instr = path[2];
-            if(!mountInstruction(instr))
+            if(!mountInstruction(instr)){
                 alivePath.splice(p, 1);
+                console.log("Unmounted");
+            }
         }
 
     }
