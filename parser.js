@@ -363,7 +363,6 @@ function Parser(bag, str, cbk){
     bag.args = [];
 
     var lastDiskStr;
-    var diskIsOrdered = false;
 
     ///
     /// Parser Path 
@@ -516,7 +515,7 @@ function Parser(bag, str, cbk){
 
         //todo: remove from alivePaths
         var pos = alivePath.indexOf(instr);
-        alivePath.splice(pos, 1);
+        if(pos >= 0) alivePath.splice(pos, 1);
 
         console.log("debug: instruction destroyed", instr);
         if(instr.name=="function")
@@ -539,7 +538,7 @@ function Parser(bag, str, cbk){
         return false;
     }
 
-    function confirmInstruction(){
+    /*function confirmInstruction(){
         console.log("confirm", instruction);
         instruction.parent.instructions.push(instruction);
 
@@ -554,13 +553,7 @@ function Parser(bag, str, cbk){
         }
 
         //alivePath.splice(alivePath.indexOf(instruction), 1);
-
-        /*var instr = instruction;
-        var prev = instruction.close();
-        var disk = prev.getParentDisk();
-        prev.instructions.push(instr);
-        ch angeDisk(disk); //it has a sense?*/
-    }
+    }*/
 
     ///
     /// Ensure Object Disk
@@ -569,7 +562,10 @@ function Parser(bag, str, cbk){
         if(disk){
             if(typeof disk == 'string'){
                 if(disk[0]=='.' && lastDiskStr)
-                    disk = lastDiskStr+ret;
+                    disk = lastDiskStr+disk;
+
+                if(disk.includes('['))
+                    console.log("stop!");
 
                 disk = eval('disks.'+disk);
 
@@ -583,10 +579,12 @@ function Parser(bag, str, cbk){
                     }
                 }
 
-                lastDiskStr = disk;
+                lastDiskStr = disk.fullName || disk;
                 return disk;
             }
         }
+
+        return disk;
     }
 
     ///
@@ -594,34 +592,37 @@ function Parser(bag, str, cbk){
     ///
     function changeDisk(ret){
         if(ret){ 
+            var res = false;
+
             //var instr = bag.instruction.getInstr();
             instr = instruction;
 
             var disk = ensureObjectDisk(ret);
+
+            if(!disk.Transparent /*&& instr._disk != disk*/){
+                /*instr = instr.insert(disk.name);
+                instr._disk = disk;*/
+                if(disk.name == undefined)
+                    console.log("debug");
+                parserPathPush(disk.name, disk);    
+                instruction.disk = disk;
+                res = true;  
+            }
 
             if(isDiskConfirmed(disk)){
                 bag.disk = disk;  
                 console.log('debug: bag.disk', disk);
             }
 
-            if(!disk.Transparent /*&& instr._disk != disk*/){
-                /*instr = instr.insert(disk.name);
-                instr._disk = disk;*/
-                parserPathPush(disk.name, disk);                
-                instruction.disk = disk;
-            }
-
             //todo: insert ad hoc instruction if disk is object         
 
             if(disk.OnStart) 
-                disk.OnStart(bag);
+                disk.OnStart(bag); 
 
-            diskIsOrdered = disk.MatchesOrder;
-            if(diskIsOrdered)
-                instr._curOrder = instr._curOrder || 0;   
-
-            return disk;
+            return res; //returns if disk is added to parserPaths
         }
+
+        return false;
     }
 
     ///
@@ -630,7 +631,10 @@ function Parser(bag, str, cbk){
     function exitDisk(){
         var curDisk = instruction.getParentDisk();
         //or better select it from parsePath?
-        var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
+        var nxtDisk = curDisk;//instruction.getParentDisk().disk;
+
+        if(!curDisk)
+            console.log("debug curDisk null");
 
         if(!curDisk.Transparent){
             parserPathPop(curDisk);
@@ -655,10 +659,16 @@ function Parser(bag, str, cbk){
         ///
         function updateMatchInstruction(disk){  
             disk = ensureObjectDisk(disk);
-            parserPathPush(disk);
-            changeDisk(disk);
-            alivePath.push(instruction);
-            parserPathPop(disk);
+        
+            var res = changeDisk(disk);
+            if(!res)
+                parserPathPush(disk);
+
+            if(bag.disk != disk) 
+                alivePath.push(getLastParserPath());
+            
+            if(!res)
+                parserPathPop(disk);
         }
 
         function checkMatch(match){
@@ -847,7 +857,7 @@ function Parser(bag, str, cbk){
             ///
             /// Disk Ordered
             ///
-            else if(diskIsOrdered){
+            else if(disk.MatchesOrder){
                 var pos = instr._curOrder;
                 /*var refInstr = instr;
                 while(pos == undefined && refInstr != undefined){
@@ -950,7 +960,7 @@ function Parser(bag, str, cbk){
                             if(match.onClose) 
                                 match.onClose(bag);
 
-                            confirmInstruction();
+                            //confirmInstruction();
                         }
                         else {   
                             destroyInstruction();
@@ -1013,7 +1023,7 @@ function Parser(bag, str, cbk){
                     var ret = checkMatch(match);
 
                     if(ret){
-                        confirmInstruction();
+                        //confirmInstruction();
                     }
                     else {
                         destroyInstruction();
@@ -1037,14 +1047,12 @@ function Parser(bag, str, cbk){
         }
 
         ///
-        /// Evaluate current disk (looking for new ways)
-        ///
-        evaluateDisk();
-
-        ///
         /// forkToInstruction
         ///
         function forkToInstruction(instr){
+            if(instr == null)
+                console.log("debug null instr");
+
             instruction = instr;
     
             var disk = instruction.getParentDisk();
@@ -1114,6 +1122,11 @@ function Parser(bag, str, cbk){
                 console.log("Unmounted");
             }
         }
+
+        ///
+        /// Evaluate current disk (looking for new ways)
+        ///
+        evaluateDisk();
 
     }
 
