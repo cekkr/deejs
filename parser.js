@@ -69,6 +69,24 @@ class Instruction{
         var disk = this.getParentDisk();
         return (disk.MatchesOrder && !this.completed) || disk.Transparent
     }
+
+    setParent(parent){
+        this.parent = parent;
+        this.getPath();
+    }
+
+    getPath(){
+        if(this.path) return this.path;
+
+        var path = this.name || "";
+        if(this.parent != null){
+            var gp = this.parent.getPath();
+            if(gp) path = gp + "." + path;
+        }
+
+        this.path = path;
+        return path;
+    }
 }
 
 ///
@@ -486,7 +504,7 @@ function Parser(bag, str, cbk){
             var parent = cInst;
             cInst = cInst.pathInstructions[tPath] = new Instruction();
             cInst.top = parent;
-            cInst.path = tPath;
+            //cInst.path = tPath;
             cInst.name = lastPath;
             cInst.isMatch = !isNaN(lastPath);
             cInst.obj = lastObj;
@@ -497,7 +515,7 @@ function Parser(bag, str, cbk){
             
             while(parent != null && parent.isMatch)
                     parent = parent.top;
-            cInst.parent = parent;
+            cInst.setParent(parent);
         }
         else if(Object.keys(cInst.pathInstructions).length>0){
             // You should close completed actions
@@ -1066,7 +1084,7 @@ function Parser(bag, str, cbk){
     
             var disk = instruction.getParentDisk();
     
-            var path = instr.path;
+            var path = instr.getPath();
             var paths = path.split('.');
             
             var baseInstr = bag.instruction;
