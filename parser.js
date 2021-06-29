@@ -590,6 +590,7 @@ function Parser(bag, str, cbk){
     ///
     /// Change Disk
     ///
+    var curDisk;
     function changeDisk(ret){
         if(ret){ 
             var res = false;
@@ -619,6 +620,8 @@ function Parser(bag, str, cbk){
             if(disk.OnStart) 
                 disk.OnStart(bag); 
 
+            curDisk = disk;
+
             return res; //returns if disk is added to parserPaths
         }
 
@@ -629,20 +632,26 @@ function Parser(bag, str, cbk){
     /// Exit Disk
     ///
     function exitDisk(){
-        var curDisk = instruction.getParentDisk();
+        //var curDisk = instruction.getParentDisk();
         //or better select it from parsePath?
-        var nxtDisk = curDisk;//instruction.getParentDisk().disk;
+        var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
 
         if(!curDisk)
             console.log("debug curDisk null");
 
         if(!curDisk.Transparent){
             parserPathPop(curDisk);
+            var curPath = getLastParserPath();
+            instruction = curPath[2];
+            nxtDisk = instruction.getParentDisk();
+            console.log("curPath", curPath);
         }
 
         if(nxtDisk){
             changeDisk(nxtDisk);
             //evaluateDisk(); //?
+
+            return nxtDisk;
         }
     }
 
@@ -885,8 +894,8 @@ function Parser(bag, str, cbk){
                         disk.OnExit();
 
                     instruction.completed = true;
-                    exitDisk();
-                    return evaluateDisk();
+                    var prec = exitDisk();
+                    return evaluateDisk(prec);
                 }
 
                 if(ch == '{')
@@ -925,8 +934,7 @@ function Parser(bag, str, cbk){
                     /// Go go go!
                     ///
                     parserPathPush(pos, match);
-
-                    var matchDisk = undefined;                    
+              
                     if(checkMatch(match._disk || match)) {
                         if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
                             console.log("to check");
@@ -990,7 +998,7 @@ function Parser(bag, str, cbk){
 
                             if(pos == -1){
                                 destroyInstruction();
-                                return; //?
+                                return exit(); //?
                             }
 
                             if(instr._curOrder >= matches.length){
@@ -1033,7 +1041,8 @@ function Parser(bag, str, cbk){
                     if(ret){
                         // Exit type is possible just with unordered disk
                         if(match.type == "exit"){
-                            exitDisk();                                             
+                            //exitDisk();
+                            exit();                                             
                         }              
                         
                         return true; 
