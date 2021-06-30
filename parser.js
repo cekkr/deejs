@@ -370,8 +370,7 @@ function getDiskEnsured(disk){
 }
 
 function diskHasDisk(disk, child){
-    if(disk==child)
-        return true;
+    //if(disk==child) return true;
 
     if(Array.isArray(disk))
         return disk.indexOf(child) >= 0;
@@ -381,6 +380,12 @@ function diskHasDisk(disk, child){
 
 function isDiskConfirmed(disk){
     var ensured = getDiskEnsured(disk);
+
+    if(ensured == disk)
+        return true;
+
+    ensured = ensured._parent;
+
     while(ensured){
         if(diskHasDisk(ensured, disk))
             return true;
@@ -708,8 +713,10 @@ function Parser(bag, str, cbk){
             if(!res)
                 parserPathPush(disk);
 
-            if(bag.disk != disk) 
-                alivePath.push(getLastParserPath());
+            if(bag.disk != disk) {
+                var last = getLastParserPath();
+                alivePath.push(last);
+            }
             
             if(!res)
                 parserPathPop(disk);
