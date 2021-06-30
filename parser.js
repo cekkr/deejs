@@ -901,8 +901,9 @@ function Parser(bag, str, cbk){
 
             curDisk = disk;
             
-            /*if(disk.name == "function") console.log("debug");
-            console.log(disk.name);*/
+            if(ch == "}") 
+                console.log("debug"); //todo: debug close block
+            console.log(disk.name);
 
             var matches = disk;
 
