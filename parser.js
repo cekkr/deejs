@@ -369,8 +369,25 @@ function getDiskEnsured(disk){
     return topDisk;
 }
 
+function diskHasDisk(disk, child){
+    if(disk==child)
+        return true;
+
+    if(Array.isArray(disk))
+        return disk.indexOf(child) >= 0;
+    else
+        return disk[child.name] !== undefined;
+}
+
 function isDiskConfirmed(disk){
-    return getDiskEnsured(disk) == disk;
+    var ensured = getDiskEnsured(disk);
+    while(ensured){
+        if(diskHasDisk(ensured, disk))
+            return true;
+        ensured = ensured._parent;
+    }
+
+    return false; // =(
 }
 
 initDisks(disks);
@@ -1091,16 +1108,25 @@ function Parser(bag, str, cbk){
             var curInstr = baseInstr;
     
             var p = 0;
+
             for(;p<paths.length; p++){
                 var pp = paths[p];
-                var newInstr = curInstr.pathInstructions[pp];
-    
-                if(!newInstr)
+                //var newInstr = curInstr.pathInstructions[pp];
+                var parsPath = bag.parserPath[p];
+                if(!parsPath)
+                    break;
+
+                curInstr = bag.parserPath[p][2]; //ex newInstr
+
+                /*if(!newInstr)
                     break;
     
-                curInstr = newInstr;
+                curInstr = newInstr;*/
             }
     
+            if(instr.getParentDisk() != disk)
+                console.log("debug: possible track");
+
             while(instr.getParentDisk() != disk)
                 instr = instr.parent;
     
