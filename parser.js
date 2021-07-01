@@ -387,7 +387,7 @@ function isDiskConfirmed(disk){
 
     if(!ensured){
         console.log("debug: !ensured");
-        //getDiskEnsured(disk);
+        getDiskEnsured(disk);
     }
 
     if(ensured == disk)
@@ -529,25 +529,40 @@ function Parser(bag, str, cbk){
         var tPath = "";
         var lastPath;
         var lastObj;
+        var lastInstr;
         var cInst = bag.instruction;
         for(var paths of bag.parserPath){
             var path = paths[0];
             lastObj = paths[1];
+            if(paths[2]) lastInstr = paths[2];
             if(tPath) tPath += ".";
             tPath += path;
             
-            if(cInst.pathInstructions[path]){
+            /*if(cInst.pathInstructions[path]){
                 cInst = cInst.pathInstructions[path];
+                if(cInst) lastInstr = cInst;
                 tPath = "";
-            }
+            }*/
 
             lastPath = path;
         }
 
-        if(tPath != getLastParserPath()[0]){
-            var parent = cInst;
-            cInst = cInst.pathInstructions[tPath] = new Instruction();
-            cInst.top = parent;
+        var glPP = getLastParserPath();
+        cInst = glPP[2];
+
+        if(glPP[0]=="function")
+            console.log("debug here");
+
+        if(cInst == undefined)
+            console.log("debug cInst");
+
+        if(!cInst){
+            var parent = lastInstr;
+            cInst = new Instruction();
+            if(parent)
+                parent.pathInstructions[tPath]
+
+            //cInst.top = parent;
             //cInst.path = tPath;
             cInst.name = lastPath;
             cInst.isMatch = !isNaN(lastPath);
@@ -556,16 +571,21 @@ function Parser(bag, str, cbk){
             /*if(cInst.isMatch){ 
                 alivePath.push(cInst);
             }*/
-            
-            while(parent != null && parent.isMatch)
-                    parent = parent.top;
+
+            if(!parent)
+                console.log("debug cInst parent");
+
             cInst.setParent(parent);
+
+            while(parent != null && parent.isMatch)
+                    parent = parent.parent;
+            
         }
-        else if(Object.keys(cInst.pathInstructions).length>0){
+        /*else if(Object.keys(cInst.pathInstructions).length>0){
             // You should close completed actions
             //todo
             //console.log("todo");
-        }
+        }*/
         
         instruction = cInst;
     }
@@ -596,8 +616,9 @@ function Parser(bag, str, cbk){
 
     function destroyInstruction(){
         var instr = instruction;
-        instruction = instr.top;
-        delete instr.top[instr.path];
+        instruction = instr.parent;
+        if(instruction)
+            delete instr.pathInstructions[instr.name];
 
         //todo: remove from alivePaths
         var pos = alivePath.indexOf(instr);
@@ -627,7 +648,8 @@ function Parser(bag, str, cbk){
 
     function confirmInstruction(){
         console.log("confirm", instruction);
-        instruction.parent.instructions.push(instruction);
+        if(instruction.parent)
+            instruction.parent.instructions.push(instruction);
 
         /*if(instructionIsInsideBagDisk()){
             var pp = getLastParserPath();
