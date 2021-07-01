@@ -148,10 +148,11 @@ const disks = {
         MatchesThrough: ['whitespace', 'separator'],
         Matches: [
             {
-                match: '?>',
+                type: "exit",
+                match: '?>'/*,
                 action: function(){
                     return 'root';
-                }
+                }*/
             }, 
             {
                 match: 'async',
@@ -468,7 +469,7 @@ function Parser(bag, str, cbk){
             pos = what;
             instr = name;
             what = name.obj;
-            name = what.name;  
+            name = instr.name;  
         }
         else if(name.constructor.name == "Object"){
             pos = what;
@@ -497,13 +498,14 @@ function Parser(bag, str, cbk){
                 }
             }
 
-            newArr.push(arr);
+            bag.parserPath.push(arr);
             console.log("arrg", bag.parserPath, newArr);
             bag.parserPath = bag.parserPath.concat(newArr);
             console.log(bag.parserPath);
         }
-        else 
+        else {
             bag.parserPath.push(arr);
+        }
 
         if(arr.length<3){
             selectInstruction();
@@ -548,15 +550,15 @@ function Parser(bag, str, cbk){
         }
 
         var glPP = getLastParserPath();
+
+        if(glPP==undefined){
+            console.log("debug");
+            return;
+        }
+
         cInst = glPP[2];
 
-        if(glPP[0]=="function")
-            console.log("debug here");
-
-        if(cInst == undefined)
-            console.log("debug cInst");
-
-        if(!cInst){
+        if(!cInst && lastPath !== undefined){
             var parent = lastInstr;
             cInst = new Instruction();
             if(parent)
@@ -572,9 +574,6 @@ function Parser(bag, str, cbk){
                 alivePath.push(cInst);
             }*/
 
-            if(!parent)
-                console.log("debug cInst parent");
-
             cInst.setParent(parent);
 
             while(parent != null && parent.isMatch)
@@ -587,7 +586,8 @@ function Parser(bag, str, cbk){
             //console.log("todo");
         }*/
         
-        instruction = cInst;
+        if(cInst)
+            instruction = cInst;
     }
 
     ///
@@ -616,6 +616,10 @@ function Parser(bag, str, cbk){
 
     function destroyInstruction(){
         var instr = instruction;
+
+        if(!instr)
+            return;
+
         instruction = instr.parent;
         if(instruction)
             delete instr.pathInstructions[instr.name];
@@ -673,9 +677,6 @@ function Parser(bag, str, cbk){
                 if(disk[0]=='.' && lastDiskStr)
                     disk = lastDiskStr+disk;
 
-                if(disk.includes('['))
-                    console.log("stop!");
-
                 disk = eval('disks.'+disk);
 
                 if(disk == undefined){
@@ -712,8 +713,7 @@ function Parser(bag, str, cbk){
             if(!disk.Transparent /*&& instr._disk != disk*/){
                 /*instr = instr.insert(disk.name);
                 instr._disk = disk;*/
-                if(disk.name == undefined)
-                    console.log("debug");
+
                 parserPathPush(disk.name, disk);    
                 instruction.disk = disk;
                 res = true;  
@@ -721,7 +721,6 @@ function Parser(bag, str, cbk){
 
             if(isDiskConfirmed(disk)){
                 bag.disk = disk;  
-                console.log('debug: bag.disk', disk);
             }
 
             //todo: insert ad hoc instruction if disk is object         
@@ -748,17 +747,14 @@ function Parser(bag, str, cbk){
         //nxtDisk correction
         //parserPathPop(instruction);
         var nextPP = getLastParserPath();
-        nxtDisk = nextPP[1];
-
-        if(!curDisk)
-            console.log("debug curDisk null");
+        var nxtInstr = nextPP[2];
+        nxtDisk = nxtInstr.getParentDisk(); //nextPP[1];
 
         if(!curDisk.Transparent){
             parserPathPop(curDisk);
             var curPath = getLastParserPath();
             instruction = curPath[2];
             nxtDisk = instruction.getParentDisk();
-            console.log("curPath", curPath);
         }
 
         if(nxtDisk){
@@ -938,20 +934,14 @@ function Parser(bag, str, cbk){
                 var pos = parserPathGetPos(disk);
                 var ppos = parseInt(pos)+1;
                 var pnum = bag.parserPath.length-ppos;
-                var test = bag.parserPath.splice(ppos, pnum);
-                console.log("test");
+                /*bag.parserPath = */bag.parserPath.splice(ppos, pnum);
 
                 //this is the automatic path
             }
 
             curDisk = disk;
             
-            if(ch == "{") 
-                console.log("debug");
-
-            if(ch == "}") 
-                console.log("debug"); //todo: debug close block
-            console.log(disk.name);
+            console.log("evaluating", disk.name);
 
             var matches = disk;
 
@@ -968,6 +958,29 @@ function Parser(bag, str, cbk){
 
             if(!Array.isArray(matches))
                 matches = [matches];
+
+            ///
+            /// Exit
+            ///
+            function exit(){
+                var instr = instruction;
+
+                if(disk.OnExit)
+                    disk.OnExit();
+
+                var lastPP = getLastParserPath();
+                if(lastPP[2] == instr){
+                    //var ap = removeAlivePath(instr);
+                    //parserPathPop();
+                    if(comingFromAlivePathNum>=0){
+                        alivePath[comingFromAlivePathNum] = getLastParserPath();
+                    }
+                }
+
+                instr.completed = true;
+                var prec = exitDisk();
+                return evaluateDisk(prec);
+            }
 
             ///
             /// Disks match (theoretical)
@@ -997,27 +1010,6 @@ function Parser(bag, str, cbk){
                         if(checkMatch('"'+disk.MatchesThrough[i]))
                             return true;
                     }
-                }
-
-                function exit(){
-                    var instr = instruction;
-                    console.log("exit", instr);
-
-                    if(disk.OnExit)
-                        disk.OnExit();
-
-                    var lastPP = getLastParserPath();
-                    if(lastPP[2] == instr){
-                        //var ap = removeAlivePath(instr);
-                        //parserPathPop();
-                        if(comingFromAlivePathNum>=0){
-                            alivePath[comingFromAlivePathNum] = getLastParserPath();
-                        }
-                    }
-
-                    instr.completed = true;
-                    var prec = exitDisk();
-                    return evaluateDisk(prec);
                 }
 
                 //if(ch == '{') console.log('debug');
@@ -1140,7 +1132,6 @@ function Parser(bag, str, cbk){
                 if(pos >= matches.length){
                     //todo: exception: excepted...
                     //destroyInstruction();
-
                     return exit();
                 }
             }
@@ -1183,9 +1174,6 @@ function Parser(bag, str, cbk){
         /// forkToInstruction
         ///
         function forkToInstruction(instr){
-            if(instr == null)
-                console.log("debug null instr");
-
             instruction = instr;
     
             var disk = instruction.getParentDisk();
@@ -1213,14 +1201,14 @@ function Parser(bag, str, cbk){
                 curInstr = newInstr;*/
             }
     
-            if(instr.getParentDisk() != disk)
-                console.log("debug: possible track");
+            /*if(instr.getParentDisk() != disk)
+                console.log("debug: possible track");*/
 
             while(instr.getParentDisk() != disk)
                 instr = instr.parent;
     
             while(instr != curInstr){
-                console.log("pushing", instr);
+                //console.log("pushing", instr);
                 parserPathPush(instr, p);
                 instr = instr.parent;
             }
@@ -1228,7 +1216,7 @@ function Parser(bag, str, cbk){
             // Select disk
             changeDisk(disk);
             if(instruction.isMatch){
-                console.log('debug: instruction isMatch');
+                //console.log('debug: instruction isMatch');
                 parserPathPush(instruction);
                 return checkMatch(instruction);
             }
@@ -1259,11 +1247,11 @@ function Parser(bag, str, cbk){
         for (var p in alivePath){
             var path = alivePath[p];
             comingFromAlivePathNum = p;
-            console.log("Concurrent instruction", path);
+            //console.log("Concurrent instruction", path);
             var instr = path[2];
             if(!mountInstruction(instr)){
                 alivePath.splice(p, 1);
-                console.log("Unmounted", path);
+                //console.log("Unmounted", path);
             }
         }
         comingFromAlivePathNum = -1;
