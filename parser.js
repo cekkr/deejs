@@ -148,11 +148,10 @@ const disks = {
         MatchesThrough: ['whitespace', 'separator'],
         Matches: [
             {
-                type: "exit",
-                match: '?>'/*,
+                match: '?>',
                 action: function(){
                     return 'root';
-                }*/
+                }
             }, 
             {
                 match: 'async',
@@ -465,6 +464,9 @@ function Parser(bag, str, cbk){
     function parserPathPush(name, what=-1, pos=-1){
         var instr;
 
+        if(name == undefined)
+            console.log("debug");
+
         if(name.constructor.name == "Instruction"){
             pos = what;
             instr = name;
@@ -493,13 +495,11 @@ function Parser(bag, str, cbk){
             for(;p<bag.parserPath.length; p++){
                 if(p>=pos){
                     var pop = bag.parserPath.pop();
-                    console.log("debug pop", pop);
                     newArr.unshift(pop);
                 }
             }
 
             bag.parserPath.push(arr);
-            console.log("arrg", bag.parserPath, newArr);
             bag.parserPath = bag.parserPath.concat(newArr);
             console.log(bag.parserPath);
         }
@@ -539,7 +539,7 @@ function Parser(bag, str, cbk){
             lastObj = paths[1];
             if(paths[2]) lastInstr = paths[2];
             if(tPath) tPath += ".";
-            tPath += path[0];
+            tPath += path;
             
             /*if(cInst.pathInstructions[path]){
                 cInst = cInst.pathInstructions[path];
@@ -620,8 +620,9 @@ function Parser(bag, str, cbk){
         return false;
     }
 
-    function destroyInstruction(){
-        var instr = instruction;
+    function destroyInstruction(instr){
+        if(!instr) 
+            instr = instruction;
 
         if(!instr)
             return;
@@ -661,8 +662,11 @@ function Parser(bag, str, cbk){
             instr = instruction;
 
         console.log("confirm", instr);
-        if(instr.parent)
-        instr.parent.instructions.push(instr);
+        if(instr.parent){
+            instr.parent.instructions.push(instr);
+            /*if(instr.parent.isMatch)
+                instr.parent.parent.instructions.push(instr);*/
+        }
         else 
             console.log("no parent for",instr);
         /*if(instructionIsInsideBagDisk()){
@@ -723,7 +727,7 @@ function Parser(bag, str, cbk){
                 /*instr = instr.insert(disk.name);
                 instr._disk = disk;*/
 
-                var glPP = getLastParserPath();
+                //var glPP = getLastParserPath();
 
                 parserPathPush(disk.name, disk);   
 
@@ -759,7 +763,7 @@ function Parser(bag, str, cbk){
         if(curDisk == undefined)
             return false;
 
-        var glPP = getLastParserPath();
+        //var glPP = getLastParserPath();
 
         //or better select it from parsePath?
         var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
@@ -781,10 +785,10 @@ function Parser(bag, str, cbk){
             nxtDisk = instruction.getParentDisk();
 
             //saves inTag matches in root...
-            instruction.instructions.push(glPP[2]);
+            //nxtInstr.parent.instructions.push(nxtInstr);
         }
 
-        if(nxtDisk){
+        if(nxtDisk && nxtDisk != disks){
             changeDisk(nxtDisk);
             //evaluateDisk(); //?
 
@@ -792,9 +796,11 @@ function Parser(bag, str, cbk){
         }
     }
 
-    //parserPathPush(bag.instruction);
+    bag.instruction.name = "base";
+    bag.instruction.obj = disks;
+    parserPathPush(bag.instruction);
     changeDisk('root');
-    bag.instruction = instruction;
+    //bag.instruction = instruction;
 
     let j = 0;
     for(; j<str.length; j++){
@@ -809,6 +815,11 @@ function Parser(bag, str, cbk){
         function updateMatchInstruction(disk){  
             disk = ensureObjectDisk(disk);
         
+            var glPP = getLastParserPath();
+            if(!disk.fullName.startsWith(glPP[1].fullName)){
+                parserPathPop();
+            }
+
             var res = changeDisk(disk);
 
             if(!res)
@@ -1008,7 +1019,8 @@ function Parser(bag, str, cbk){
 
                 instr.completed = true;
                 var prec = exitDisk();
-                return evaluateDisk(prec);
+                //return evaluateDisk(prec);
+                return false;
             }
 
             ///
@@ -1075,8 +1087,9 @@ function Parser(bag, str, cbk){
                     ///
                     /// Go go go!
                     ///
-                    parserPathPush(pos, match);
-              
+                    var glPP = getLastParserPath();
+                    //parserPathPush(pos, match);                    
+
                     if(checkMatch(match._disk || match)) {
                         if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
                             console.log("to check");
@@ -1093,7 +1106,7 @@ function Parser(bag, str, cbk){
                                 /*var oldDisk = instr.close()._disk;
                                 changeDisk(oldDisk); */
                                 //destroyInstruction();
-                                parserPathPop();
+                                //parserPathPop();
                                 exit();
 
                             case 'repeatable':
@@ -1112,11 +1125,13 @@ function Parser(bag, str, cbk){
                             if(match.onClose) 
                                 match.onClose(bag);
 
-                            confirmInstruction();
-                            parserPathPop();
+                            if(instruction != glPP[2])
+                                confirmInstruction(glPP);
+                            //parserPathPop();
                         }
-                        else {   
-                            destroyInstruction();
+                        else { 
+                            if(instruction != glPP[2])  
+                                destroyInstruction(glPP);
                             
                             switch(match.type){
                                 case 'mandatory':
@@ -1170,18 +1185,19 @@ function Parser(bag, str, cbk){
             else {
                 var i=0;
                 for(var match of matches){
-                    parserPathPush(i++, match);
-
+                    //parserPathPush(i++, match);
                     var glPP = getLastParserPath();
 
                     var ret = checkMatch(match);
 
                     if(ret){
-                        confirmInstruction();
-                        confirmInstruction(glPP);
+                        if(instruction != glPP[2])
+                            confirmInstruction();
+                        //confirmInstruction(glPP);
                     }
                     else {
-                        destroyInstruction();
+                        if(instruction != glPP[2])
+                            destroyInstruction();
                         //parserPathPop(match);
                     }        
 
