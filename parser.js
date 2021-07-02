@@ -201,7 +201,7 @@ const disks = {
                     {
                         match: ['var', 'let', 'const'],
                         action: function(bag){
-                            var instr = bag.instruction.getInstr();
+                            var instr = instruction;
                             instr = instr.insert('declaration');
                             instr.type = bag.lastMatchString;
                         }
@@ -520,6 +520,15 @@ function Parser(bag, str, cbk){
         return true;
     }
 
+    function parserPathReplace(from, to){
+        for(var i in alivePath){
+            if(alivePath[i][2] == from[2]){
+                alivePath[i] = to;
+                break;
+            }
+        }
+    }
+
     function getLastParserPath(){
         var n = bag.parserPath.length;
         if(n == 0) 
@@ -553,6 +562,8 @@ function Parser(bag, str, cbk){
             }*/
 
             if(lastPaths){
+                if(paths[0] == 'varDeclaration')
+                    console.log("debug");
                 lastPaths[2].pathInstructions[paths[0]] = paths[2];
             }
 
@@ -573,7 +584,7 @@ function Parser(bag, str, cbk){
             var parent = lastInstr;
             cInst = new Instruction();
             if(parent)
-                parent.pathInstructions[tPath]
+                parent.pathInstructions[lastPath] = cInst;
 
             //cInst.top = parent;
             //cInst.path = tPath;
@@ -667,13 +678,8 @@ function Parser(bag, str, cbk){
             instr = instruction;
 
         console.log("confirm", instr);
-        if(instr.parent){
-            instr.parent.instructions.push(instr);
-            /*if(instr.parent.isMatch)
-                instr.parent.parent.instructions.push(instr);*/
-        }
-        else 
-            console.log("no parent for",instr);
+        instr.confirm();
+
         /*if(instructionIsInsideBagDisk()){
             var pp = getLastParserPath();
             alivePath.push(pp);            
@@ -920,9 +926,16 @@ function Parser(bag, str, cbk){
                 //var prevDisk = instr.disk;
                 var tmpDisk = match._disk;
 
+                var glPP = getLastParserPath();
+
                 parserPathPush(tmpDisk.name, tmpDisk);
                 changeDisk(tmpDisk);
                 var res = evaluateDisk(tmpDisk);
+
+                if(res && !tmpDisk.Transparent){
+                    parserPathReplace(glPP, getLastParserPath());
+                }
+
                 parserPathPop(tmpDisk);
                 //exitDisk();
 
@@ -1104,7 +1117,10 @@ function Parser(bag, str, cbk){
                     var glPP = getLastParserPath();
                     //parserPathPush(pos, match);                    
 
-                    if(checkMatch(match._disk || match)) {
+                    if(glPP[0]=='block' && match=='inTag')
+                        console.log("debug");
+
+                    if(checkMatch(match)) {
                         if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
                             console.log("to check");
                         }
