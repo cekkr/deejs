@@ -87,6 +87,11 @@ class Instruction{
         this.path = path;
         return path;
     }
+
+    confirm(){
+        if(this.parent)
+            this.parent.instructions.push(this);
+    }
 }
 
 ///
@@ -721,13 +726,14 @@ function Parser(bag, str, cbk){
             //var instr = bag.instruction.getInstr();
             instr = instruction;
 
-            var disk = ensureObjectDisk(ret);
+            var disk = ensureObjectDisk(ret);      
 
             if(!disk.Transparent /*&& instr._disk != disk*/){
                 /*instr = instr.insert(disk.name);
                 instr._disk = disk;*/
 
                 //var glPP = getLastParserPath();
+                //if(glPP[2].parent) glPP[2].parent.instructions.push(glPP[2]);
 
                 parserPathPush(disk.name, disk);   
 
@@ -800,6 +806,7 @@ function Parser(bag, str, cbk){
     bag.instruction.obj = disks;
     parserPathPush(bag.instruction);
     changeDisk('root');
+    instruction.confirm();
     //bag.instruction = instruction;
 
     let j = 0;
@@ -812,9 +819,14 @@ function Parser(bag, str, cbk){
         /// Check Match
         ///
         var comingFromAlivePathNum = -1;
-        function updateMatchInstruction(disk){  
+        function updateMatchInstruction(disk){
             disk = ensureObjectDisk(disk);
         
+            if(!disk){
+                console.log("debug null disk");
+                return;
+            }
+
             var glPP = getLastParserPath();
             if(!disk.fullName.startsWith(glPP[1].fullName)){
                 parserPathPop();
@@ -1009,6 +1021,10 @@ function Parser(bag, str, cbk){
                     disk.OnExit();
 
                 var lastPP = getLastParserPath();
+
+                instr.completed = true;
+                var prec = exitDisk();
+
                 if(lastPP[2] == instr){
                     //var ap = removeAlivePath(instr);
                     //parserPathPop();
@@ -1017,8 +1033,6 @@ function Parser(bag, str, cbk){
                     }
                 }
 
-                instr.completed = true;
-                var prec = exitDisk();
                 //return evaluateDisk(prec);
                 return false;
             }
