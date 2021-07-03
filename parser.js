@@ -746,10 +746,16 @@ function Parser(bag, str, cbk){
                 if(glPP[0]=='block' && disk.name == "inTag")
                     console.log("debug");
 
+                var alivePos = alivePath.indexOf(glPP);
+
                 //if(glPP[2].parent) glPP[2].parent.instructions.push(glPP[2]);
 
-                if(!getBack)
+                if(!getBack){
                     parserPathPush(disk.name, disk);   
+
+                    if(glPP>=0)
+                        alivePath[glPP] = getLastParserPath();
+                }
 
                 //if(!disk.MatchesOrder)
                     //glPP[2].instructions.push(instruction);
@@ -795,11 +801,10 @@ function Parser(bag, str, cbk){
 
         //nxtDisk correction
         //parserPathPop(instruction);
-        var nextPP = getLastParserPath();
-        var nxtInstr = nextPP[2];
-        nxtDisk = nxtInstr.getParentDisk(); //nextPP[1];
+        var curPP = getLastParserPath();
+        var alivePos = alivePath.indexOf(curPP);
 
-        if(!curDisk.Transparent){
+        if(!curDisk.Transparent || true){ //experimental: try ever to remove it
             parserPathPop(curDisk);
             var curPath = getLastParserPath();
 
@@ -808,6 +813,9 @@ function Parser(bag, str, cbk){
 
             instruction = curPath[2];
             nxtDisk = instruction.getParentDisk();
+
+            if(alivePos>=0)
+                alivePath[alivePos] = curPath;
 
             //saves inTag matches in root...
             //nxtInstr.parent.instructions.push(nxtInstr);
