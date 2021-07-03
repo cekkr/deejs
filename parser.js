@@ -192,7 +192,10 @@ const disks = {
                 {
                     type: 'mandatory',
                     match: function(ch){
-                        return isAlpha(ch);
+                        var isIt = isAlpha(ch);
+                        if(isIt)
+                            console.log("debug");
+                        return isIt;
                     }
                 }
             ],
@@ -202,7 +205,7 @@ const disks = {
                         match: ['var', 'let', 'const'],
                         action: function(bag){
                             var instr = instruction;
-                            instr = instr.insert('declaration');
+                            //instr = instr.insert('declaration');
                             instr.type = bag.lastMatchString;
                         }
                     }
