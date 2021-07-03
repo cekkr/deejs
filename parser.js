@@ -484,10 +484,14 @@ function Parser(bag, str, cbk){
             name = what.name;
         }
 
-        for(var pp of bag.parserPath){
+        /*for(var pp of bag.parserPath){
             if(pp[1]==what || pp[2] == what) 
                 return false;
-        }
+        }*/
+
+        var glPP = getLastParserPath();
+        if(glPP && (glPP[1]==what || glPP[2] == what)) 
+            return false;
 
         var arr = [name, what];
 
@@ -725,7 +729,7 @@ function Parser(bag, str, cbk){
     ///
     /// Change Disk
     ///
-    function changeDisk(ret){
+    function changeDisk(ret, getBack=false){
         if(ret){ 
             var res = false;
 
@@ -738,10 +742,14 @@ function Parser(bag, str, cbk){
                 /*instr = instr.insert(disk.name);
                 instr._disk = disk;*/
 
-                //var glPP = getLastParserPath();
+                var glPP = getLastParserPath();
+                if(glPP[0]=='block' && disk.name == "inTag")
+                    console.log("debug");
+
                 //if(glPP[2].parent) glPP[2].parent.instructions.push(glPP[2]);
 
-                parserPathPush(disk.name, disk);   
+                if(!getBack)
+                    parserPathPush(disk.name, disk);   
 
                 //if(!disk.MatchesOrder)
                     //glPP[2].instructions.push(instruction);
@@ -770,8 +778,9 @@ function Parser(bag, str, cbk){
     ///
     /// Exit Disk
     ///
-    function exitDisk(){
-        var curDisk = instruction.getParentDisk();
+    function exitDisk(curDisk){
+        if(!curDisk)
+            curDisk = instruction.getParentDisk();
         if(curDisk == undefined)
             return false;
 
@@ -779,6 +788,10 @@ function Parser(bag, str, cbk){
 
         //or better select it from parsePath?
         var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
+
+        if(curDisk == nxtDisk){
+            return false;
+        }
 
         //nxtDisk correction
         //parserPathPop(instruction);
@@ -801,7 +814,7 @@ function Parser(bag, str, cbk){
         }
 
         if(nxtDisk && nxtDisk != disks){
-            changeDisk(nxtDisk);
+            changeDisk(nxtDisk, true);
             //evaluateDisk(); //?
 
             return nxtDisk;
@@ -928,7 +941,7 @@ function Parser(bag, str, cbk){
 
                 var glPP = getLastParserPath();
 
-                parserPathPush(tmpDisk.name, tmpDisk);
+                //parserPathPush(tmpDisk.name, tmpDisk);
                 changeDisk(tmpDisk);
                 var res = evaluateDisk(tmpDisk);
 
@@ -936,7 +949,7 @@ function Parser(bag, str, cbk){
                     parserPathReplace(glPP, getLastParserPath());
                 }
 
-                parserPathPop(tmpDisk);
+                //parserPathPop(tmpDisk);
                 //exitDisk();
 
                 return res;
@@ -1037,7 +1050,7 @@ function Parser(bag, str, cbk){
                 var lastPP = getLastParserPath();
 
                 instr.completed = true;
-                var prec = exitDisk();
+                var prec = exitDisk(disk);
 
                 if(lastPP[2] == instr){
                     //var ap = removeAlivePath(instr);
