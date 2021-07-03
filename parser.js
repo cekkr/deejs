@@ -941,6 +941,7 @@ function Parser(bag, str, cbk){
 
                 return res;
             }
+            
             ///
             /// Normal matching
             ///
