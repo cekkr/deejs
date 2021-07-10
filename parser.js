@@ -150,6 +150,7 @@ const disks = {
         }
     ],
     inTag:{ 
+        Important: true,
         MatchesThrough: ['whitespace', 'separator'],
         Matches: [
             {
@@ -173,6 +174,32 @@ const disks = {
             'expression'
             
         ],
+        OverAll: {
+            comment: {
+                Important: true,
+                MatchesOrder: true,
+                Matches: [
+                    {
+                        match: ['/*']
+                    },
+                    {
+                        match: ['*/']
+                    }
+                ]
+            },
+            commentInline: {
+                Important: true,
+                MatchesOrder: true,
+                Matches: [
+                    {
+                        match: ['//']
+                    },
+                    {
+                        match: ['\n']
+                    }
+                ]
+            }
+        },
         whitespace: {
             Transparent: true,
             Matches: function(ch){
@@ -346,7 +373,7 @@ const disks = {
     }
 };
 
-function initDisks(disk=undefined, name=''){
+function initDisks(disk=undefined, name='', overAll=null){
     for(var p in disk){
         if(p != '_parent' && typeof disk[p] == 'object'){
             if(isAlphaLowerCase(p[0])){
@@ -354,7 +381,30 @@ function initDisks(disk=undefined, name=''){
                 var thisName = (name!=''?name+'.':'')+p;
                 disk[p].name = p;
                 disk[p].fullName = thisName;
-                initDisks(disk[p], thisName);
+
+                if(disk[p].OverAll){
+                    if(!overAll) overAll = [];
+                    for(var o in disk[p].OverAll){
+                        var obj = disk[p].OverAll[o];
+
+                        if(typeof obj == "string")
+                            overAll.push(obj);
+                        else 
+                            overAll.push(o);
+                    }
+                }
+
+                if(overAll){
+                    if(!Array.isArray(disk[p].MatchesThrough)){
+                        disk[p].MatchesThrough = disk[p].MatchesThrough ? [disk[p].MatchesThrough] : [];
+
+                        for(var o of overAll){
+                            disk[p].MatchesThrough.push(o);
+                        }
+                    }
+                }
+
+                initDisks(disk[p], thisName, overAll ? Utils.copyInNewObject(overAll) : null);
             }
         }
     }
@@ -391,6 +441,9 @@ function diskHasDisk(disk, child){
 }
 
 function isDiskConfirmed(disk){
+    if(disk.Important)
+        return true;
+
     var ensured = getDiskEnsured(disk);
 
     if(!ensured){
@@ -756,8 +809,8 @@ function Parser(bag, str, cbk){
                 if(!getBack){
                     parserPathPush(disk.name, disk);   
 
-                    if(glPP>=0)
-                        alivePath[glPP] = getLastParserPath();
+                    if(alivePos>=0)
+                        alivePath[alivePos] = getLastParserPath();
                 }
 
                 //if(!disk.MatchesOrder)

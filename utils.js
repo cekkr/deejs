@@ -1,12 +1,10 @@
 module.exports = {
     copyInNewObject: function(obj){
         var nObj;
-        if(Array.isArray(obj)){
+        if(Array.isArray(obj))
             nObj = [];
-        }
-        else {
+        else 
             nObj = {};
-        }
 
         for(var p in obj){
             nObj[p] = obj[p];
