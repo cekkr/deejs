@@ -1391,6 +1391,9 @@ function Parser(bag, str, cbk){
             var res = forkToInstruction(instr);
 
             //todo: check current parserPath and update the new parser path if there is a disk ripetition
+            if(bag.disk.Important){
+                
+            }
 
             instruction = scurInstr;
             bag.parserPath = scurParserPath;
