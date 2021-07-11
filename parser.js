@@ -272,7 +272,7 @@ const disks = {
                         console.log("debug block");
                     }
                 },
-                'inTag',
+                '!inTag',
                 {
                     type: 'mandatory',
                     match: '}',
@@ -1394,8 +1394,12 @@ function Parser(bag, str, cbk){
             /// Ripristinate old variable
 
             //Inherit parserPath from last operation if disk coincide
-            if(bag.disk != scurDisk){
-                bag.parserPath = scurParserPath;    
+            if(instr.getParentDisk() != scurDisk){                
+                if(!res)
+                    console.log("debug");
+
+                // Turn back
+                bag.parserPath = scurParserPath;  
             }
             else {
                 // Remove from alivePath if the path is "official"
