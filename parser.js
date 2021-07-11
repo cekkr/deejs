@@ -802,15 +802,15 @@ function Parser(bag, str, cbk){
                 if(glPP[0]=='block' && disk.name == "inTag")
                     console.log("debug");
 
-                var alivePos = alivePath.indexOf(glPP);
+                //var alivePos = alivePath.indexOf(glPP);
 
                 //if(glPP[2].parent) glPP[2].parent.instructions.push(glPP[2]);
 
                 if(!getBack){
                     parserPathPush(disk.name, disk);   
 
-                    if(alivePos>=0)
-                        alivePath[alivePos] = getLastParserPath();
+                    if(comingFromAlivePathNum>=0)
+                        alivePath[comingFromAlivePathNum] = getLastParserPath();
                 }
 
                 //if(!disk.MatchesOrder)
@@ -857,8 +857,9 @@ function Parser(bag, str, cbk){
 
         //nxtDisk correction
         //parserPathPop(instruction);
-        var curPP = getLastParserPath();
-        var alivePos = alivePath.indexOf(curPP);
+        
+        //var curPP = getLastParserPath();
+        //var alivePos = alivePath.indexOf(curPP);
 
         if(!curDisk.Transparent || true){ //experimental: try ever to remove it
             parserPathPop(curDisk);
@@ -870,8 +871,8 @@ function Parser(bag, str, cbk){
             instruction = curPath[2];
             nxtDisk = instruction.getParentDisk();
 
-            if(alivePos>=0)
-                alivePath[alivePos] = curPath;
+            if(comingFromAlivePathNum>=0)
+                alivePath[comingFromAlivePathNum] = curPath;
 
             //saves inTag matches in root...
             //nxtInstr.parent.instructions.push(nxtInstr);
@@ -1390,13 +1391,18 @@ function Parser(bag, str, cbk){
 
             var res = forkToInstruction(instr);
 
-            //todo: check current parserPath and update the new parser path if there is a disk ripetition
-            if(bag.disk.Important){
-                
+            /// Ripristinate old variable
+
+            //Inherit parserPath from last operation if disk coincide
+            if(bag.disk != scurDisk){
+                bag.parserPath = scurParserPath;    
+            }
+            else {
+                // Remove from alivePath if the path is "official"
+                alivePath.splice(comingFromAlivePathNum, 1);
             }
 
-            instruction = scurInstr;
-            bag.parserPath = scurParserPath;
+            instruction = scurInstr;    
             bag.disk = scurDisk;
 
             return res;
