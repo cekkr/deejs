@@ -413,6 +413,12 @@ function initDisks(disk=undefined, name='', overAll=null){
     }
 }
 
+///
+/// Cycle functions
+///
+var comingFromAlivePathNum = -1;
+var line = 1, pos = 0;
+
 function getDiskEnsured(disk){
     var instr = instruction;
     if(!instr)
@@ -455,6 +461,9 @@ function isDiskConfirmed(disk){
     }
 
     if(ensured == disk)
+        return true;
+
+    if(!ensured)
         return true;
 
     ensured = ensured._parent;
@@ -634,6 +643,8 @@ function Parser(bag, str, cbk){
             lastPath = path;
         }
 
+        console.log("Selected instruction: ", tPath);
+
         var glPP = getLastParserPath();
 
         if(glPP==undefined){
@@ -643,6 +654,7 @@ function Parser(bag, str, cbk){
 
         cInst = glPP[2];
 
+        /// New instruction
         if(!cInst && lastPath !== undefined){
             var parent = lastInstr;
             cInst = new Instruction();
@@ -654,6 +666,8 @@ function Parser(bag, str, cbk){
             cInst.name = lastPath;
             cInst.isMatch = !isNaN(lastPath);
             cInst.obj = lastObj;
+
+            cInst.startLine = [line, pos];
 
             /*if(cInst.isMatch){ 
                 alivePath.push(cInst);
@@ -743,6 +757,8 @@ function Parser(bag, str, cbk){
         console.log("confirm", instr);
         instr.confirm();
 
+        bag.parserPath.pop();
+
         /*if(instructionIsInsideBagDisk()){
             var pp = getLastParserPath();
             alivePath.push(pp);            
@@ -802,7 +818,7 @@ function Parser(bag, str, cbk){
                 instr._disk = disk;*/
 
                 var glPP = getLastParserPath();
-                if(glPP[0]=='block' && disk.name == "inTag")
+                if(glPP && glPP[0]=='block' && disk.name == "inTag")
                     console.log("debug");
 
                 //var alivePos = alivePath.indexOf(glPP);
@@ -902,10 +918,16 @@ function Parser(bag, str, cbk){
         var ch = String.fromCharCode(nch);
         console.log('ch', ch);
 
+        if(ch=='\n'){
+            line++;
+            pos=0;
+        }
+        else 
+            pos++;
+
         ///
         /// Check Match
         ///
-        var comingFromAlivePathNum = -1;
         function updateMatchInstruction(disk){
             disk = ensureObjectDisk(disk);
         
@@ -1010,6 +1032,8 @@ function Parser(bag, str, cbk){
                 var glPP = getLastParserPath();
 
                 //parserPathPush(tmpDisk.name, tmpDisk);
+                if(tmpDisk.name == "expression" && glPP[0] == 'function')
+                    console.log("debug");
                 changeDisk(tmpDisk);
                 var res = evaluateDisk(tmpDisk);
 
@@ -1078,10 +1102,10 @@ function Parser(bag, str, cbk){
         function evaluateDisk(disk){
             if(!disk){
                 disk = bag.disk;
-                var pos = parserPathGetPos(disk);
+                /*var pos = parserPathGetPos(disk);
                 var ppos = parseInt(pos)+1;
                 var pnum = bag.parserPath.length-ppos;
-                /*bag.parserPath = */bag.parserPath.splice(ppos, pnum);
+                bag.parserPath.splice(ppos, pnum);*/
 
                 //this is the automatic path
             }
@@ -1199,9 +1223,6 @@ function Parser(bag, str, cbk){
                     var glPP = getLastParserPath();
                     //parserPathPush(pos, match);                    
 
-                    if(glPP[0]=='inTag' && disk.name=='expression')
-                        console.log("debug");
-
                     if(checkMatch(match)) {
                         if(instr._curMatchConfirmed != undefined && instr._curMatchConfirmed != match){
                             console.log("to check");
@@ -1300,15 +1321,18 @@ function Parser(bag, str, cbk){
                     //parserPathPush(i++, match);
                     var glPP = getLastParserPath();
 
+                    if(disk.name == "inTag")
+                        console.log("debug");
+
                     var ret = checkMatch(match);
 
                     if(ret){
-                        if(instruction != glPP[2])
+                        if(glPP && instruction != glPP[2])
                             confirmInstruction();
                         //confirmInstruction(glPP);
                     }
                     else {
-                        if(instruction != glPP[2])
+                        if(glPP && instruction != glPP[2])
                             destroyInstruction();
                         //parserPathPop(match);
                     }        
