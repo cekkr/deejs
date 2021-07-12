@@ -171,8 +171,7 @@ const disks = {
                     return 'inTag.function';
                 }
             },
-            'expression'
-            
+            'expression'   
         ],
         OverAll: {
             comment: {
@@ -203,7 +202,7 @@ const disks = {
         whitespace: {
             Transparent: true,
             Matches: function(ch){
-                return isWhitespace(ch);
+                return isWhitespace(ch) || ch=='\n' || ch =='\r';
             }
         },
         separator: {
@@ -216,12 +215,16 @@ const disks = {
             MatchesOrder: true,
             Matches: [
                 'varDeclaration',
+                'whitespace',
                 {
                     type: 'mandatory',
                     match: function(ch){
+                        var instr = instruction;
+
                         var isIt = isAlpha(ch);
                         if(isIt)
-                            console.log("debug");
+                            instr.content += ch;
+
                         return isIt;
                     }
                 }
@@ -1196,7 +1199,7 @@ function Parser(bag, str, cbk){
                     var glPP = getLastParserPath();
                     //parserPathPush(pos, match);                    
 
-                    if(glPP[0]=='block' && match=='inTag')
+                    if(glPP[0]=='inTag' && disk.name=='expression')
                         console.log("debug");
 
                     if(checkMatch(match)) {
