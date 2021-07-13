@@ -757,7 +757,7 @@ function Parser(bag, str, cbk){
         console.log("confirm", instr);
         instr.confirm();
 
-        bag.parserPath.pop();
+        //bag.parserPath.pop();
 
         /*if(instructionIsInsideBagDisk()){
             var pp = getLastParserPath();
@@ -952,6 +952,8 @@ function Parser(bag, str, cbk){
                     alivePath[comingFromAlivePathNum] = last;
                 else
                     alivePath.push(last);
+
+                parserPathPop(last);
             }
             
             if(!res)
@@ -1032,13 +1034,15 @@ function Parser(bag, str, cbk){
                 var glPP = getLastParserPath();
 
                 //parserPathPush(tmpDisk.name, tmpDisk);
-                if(tmpDisk.name == "expression" && glPP[0] == 'function')
+                if(tmpDisk.name == "expression" && glPP[0] == 'inTag')
                     console.log("debug");
                 changeDisk(tmpDisk);
                 var res = evaluateDisk(tmpDisk);
 
                 if(res && !tmpDisk.Transparent){
-                    parserPathReplace(glPP, getLastParserPath());
+                    //parserPathReplace(glPP, getLastParserPath());
+                    alivePath.push(bag.parserPath.pop());
+                    // save possibility in alivePath(?)
                 }
 
                 //parserPathPop(tmpDisk);
@@ -1112,6 +1116,9 @@ function Parser(bag, str, cbk){
 
             curDisk = disk;
             
+            if(disk.name == "expression")
+                console.log("debug");
+
             console.log("evaluating", disk.name);
 
             var matches = disk;
@@ -1236,10 +1243,6 @@ function Parser(bag, str, cbk){
                                 break;
 
                             case 'exit':
-                                /*var oldDisk = instr.close()._disk;
-                                changeDisk(oldDisk); */
-                                //destroyInstruction();
-                                //parserPathPop();
                                 exit();
 
                             case 'repeatable':
@@ -1264,7 +1267,7 @@ function Parser(bag, str, cbk){
                         }
                         else { 
                             if(instruction != glPP[2])  
-                                destroyInstruction(glPP);
+                                destroyInstruction(instruction);
                             
                             switch(match.type){
                                 case 'mandatory':
@@ -1321,21 +1324,16 @@ function Parser(bag, str, cbk){
                     //parserPathPush(i++, match);
                     var glPP = getLastParserPath();
 
-                    if(disk.name == "inTag")
-                        console.log("debug");
-
                     var ret = checkMatch(match);
 
-                    if(ret){
-                        if(glPP && instruction != glPP[2])
+                    if(glPP && instruction != glPP[2]){
+                        if(ret){
                             confirmInstruction();
-                        //confirmInstruction(glPP);
-                    }
-                    else {
-                        if(glPP && instruction != glPP[2])
+                        }
+                        else {
                             destroyInstruction();
-                        //parserPathPop(match);
-                    }        
+                        }        
+                    }
 
                     if(ret){
                         // Exit type is possible just with unordered disk
@@ -1390,8 +1388,11 @@ function Parser(bag, str, cbk){
 
             while(instr.getParentDisk() != disk)
                 instr = instr.parent;
-    
+
             while(instr != curInstr){
+                if(!instr)
+                    break;
+
                 //console.log("pushing", instr);
                 parserPathPush(instr, p);
                 instr = instr.parent;
@@ -1402,6 +1403,7 @@ function Parser(bag, str, cbk){
             if(instruction.isMatch){
                 //console.log('debug: instruction isMatch');
                 parserPathPush(instruction);
+                console.log("!!!INSTRUCTION IS MATCH!!!")
                 return checkMatch(instruction);
             }
             else 
