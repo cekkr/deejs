@@ -227,7 +227,8 @@ const disks = {
 
                         return isIt;
                     }
-                }
+                },
+                '!?^varDeclaration:operator'
             ],
             varDeclaration: {
                 Matches: [
@@ -238,6 +239,13 @@ const disks = {
                             //instr = instr.insert('declaration');
                             instr.type = bag.lastMatchString;
                         }
+                    }
+                ]
+            },
+            operator: {
+                Matches: [
+                    {
+                        match: ['==', '=']
                     }
                 ]
             }
@@ -705,7 +713,7 @@ function Parser(bag, str, cbk){
 
     function removeAlivePath(io){
         //var io = alivePathGetPos(alive);
-        if(io >= 0){
+        if(io >= 0 && io<alivePath.length){
             var path = alivePath[io];
             alivePath.splice(io, 1);
             destroyInstruction(path[2]);
@@ -1454,7 +1462,7 @@ function Parser(bag, str, cbk){
             //console.log("Concurrent instruction", path);
             var instr = path[2];
             if(!mountInstruction(instr)){
-                alivePath.splice(p, 1);
+                removeAlivePath(p);
                 //console.log("Unmounted", path);
             }
         }
