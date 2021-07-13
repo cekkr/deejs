@@ -450,7 +450,7 @@ function diskHasDisk(disk, child){
 }
 
 function isDiskConfirmed(disk){
-    if(disk.Important)
+    if(disk.Important || instruction.Important)
         return true;
 
     var ensured = getDiskEnsured(disk);
@@ -706,7 +706,9 @@ function Parser(bag, str, cbk){
     function removeAlivePath(io){
         //var io = alivePathGetPos(alive);
         if(io >= 0){
+            var path = alivePath[io];
             alivePath.splice(io, 1);
+            destroyInstruction(path[2]);
             return true;
         }
 
@@ -725,8 +727,9 @@ function Parser(bag, str, cbk){
             delete instr.pathInstructions[instr.name];
 
         //todo: remove from alivePaths
-        var pos = alivePath.indexOf(instr);
-        if(pos >= 0) alivePath.splice(pos, 1);
+        var pos = alivePathGetPos(instr);
+        if(pos >= 0) 
+            removeAlivePath(pos);
 
         parserPathPop(instr);
 
@@ -1058,7 +1061,7 @@ function Parser(bag, str, cbk){
                 if(match.match(ch, bag)){                    
                     if(match.action){
                         updateMatchInstruction(match.action(bag));
-                        instr._curOrder++;
+                        //instr._curOrder++;
                     }
                     lastMatch = match;
                     return true;
@@ -1081,11 +1084,15 @@ function Parser(bag, str, cbk){
                         if(validated){
                             bag.lastMatchString = matchMatch;
 
+                            // it jumps to the end of the word
+                            // in this sense, we are acceding in a importat keyword
+                            // and the next instruction should be considered as the base level
                             j += matchMatch.length-1;
 
                             if(match.action){
                                 updateMatchInstruction(match.action(bag));
-                                instr._curOrder++;
+                                //instr._curOrder++; ?
+                                instr.Important = true;
                             }
 
                             // Ex if match.type == 'exit'
@@ -1262,12 +1269,12 @@ function Parser(bag, str, cbk){
                                 match.onClose(bag);
 
                             if(instruction != glPP[2])
-                                confirmInstruction(glPP);
+                                confirmInstruction();
                             //parserPathPop();
                         }
                         else { 
                             if(instruction != glPP[2])  
-                                destroyInstruction(instruction);
+                                destroyInstruction();
                             
                             switch(match.type){
                                 case 'mandatory':
@@ -1321,7 +1328,6 @@ function Parser(bag, str, cbk){
             else {
                 var i=0;
                 for(var match of matches){
-                    //parserPathPush(i++, match);
                     var glPP = getLastParserPath();
 
                     var ret = checkMatch(match);
@@ -1346,8 +1352,6 @@ function Parser(bag, str, cbk){
                     }
                 }  
             }
-
-            //todo: No corrispondence, so delete the disk's instruction
 
             return false;
         }
@@ -1429,14 +1433,14 @@ function Parser(bag, str, cbk){
 
                 // Turn back
                 bag.parserPath = scurParserPath;  
+                instruction = scurInstr;    
+                bag.disk = scurDisk;
             }
             else {
                 // Remove from alivePath if the path is "official"
+                // But don't remove the instruction, because it is still in work!
                 alivePath.splice(comingFromAlivePathNum, 1);
             }
-
-            instruction = scurInstr;    
-            bag.disk = scurDisk;
 
             return res;
         }
@@ -1460,6 +1464,7 @@ function Parser(bag, str, cbk){
         /// Evaluate current disk (looking for new ways)
         ///
         evaluateDisk();
+
 
     }
 
