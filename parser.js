@@ -228,7 +228,7 @@ const disks = {
                         return isIt;
                     }
                 },
-                '!?^varDeclaration:operator'
+                '(IF varDeclaration ? ELSE !)operator'
             ],
             varDeclaration: {
                 Matches: [
@@ -983,29 +983,84 @@ function Parser(bag, str, cbk){
                 //Interpretate signals (are always referred to other symbols)
                 var objMatch = {type: "optional"};
                 var isString = false;
-                var i=0;
+                var inParenthesis = false;
+                var conditional = [], parenthesisAccumulated = "";
+
+                function applySymbol(mi){
+                    switch(mi){
+                        case '!': 
+                            objMatch.type = "mandatory";
+                            break;
+                        case '>': 
+                            objMatch.type = "repeatable";
+                            break;
+                        case '?':
+                            objMatch.type = 'optional'; //automatic
+                            break;
+                        case '=':
+                            isString = true;
+                            break;
+                        case '"':
+                            objMatch.temporary = true;
+                            break;
+                        case '(':
+                            inParenthesis = true;
+                            break;
+                    }
+                }
+
+                var i=0;                
                 for(;i<match.length; i++){
-                    if(isSymbol(match[i])){
-                        switch(match[i]){
-                            case '!': 
-                                objMatch.type = "mandatory";
-                                break;
-                            case '>': 
-                                objMatch.type = "repeatable";
-                                break;
-                            case '?':
-                                objMatch.type = 'optional'; //automatic
-                                break;
-                            case '=':
-                                isString = true;
-                                break;
-                            case '"':
-                                objMatch.temporary = true;
-                                break;
+                    var mi = match[i];
+
+                    if(inParenthesis){
+                        if(mi == ' '){
+                            if(parenthesisAccumulated) conditional.push(parenthesisAccumulated);
+                            parenthesisAccumulated = '';
+                        }
+                        else if(mi == ')'){
+                            if(parenthesisAccumulated) conditional.push(parenthesisAccumulated);
+                            inParenthesis = false;
+                        }
+                        else
+                            parenthesisAccumulated += mi;
+                    }
+                    else {
+                        if(isSymbol(mi))
+                            applySymbol(mi);
+                        else 
+                            break;
+                    }
+                }
+
+                //todo: se c'è il condizionale, esaminarlo
+                // (IF varDeclaration ? ELSE !)operator
+
+                var lastCmd = "";
+
+                for(var cond of conditional){
+                    var hasCmd = false;
+
+                    var upCond = cond.toUpperCase();
+                    switch(upCond){
+                        case 'IF':
+                        case 'ELSE':
+                            lastCmd = upCond;    
+                            hasCmd = true;
+                            break;
+                    }
+
+                    if(!hasCmd){
+                        switch(lastCmd){
+                            case 'IF':
+                                console.log("debug");                                
+                            break;
+
+                            case 'ELSE':
+
+                            break;
                         }
                     }
-                    else 
-                        break;
                 }
 
                 var toMatch = match.substr(i, match.length-i);
