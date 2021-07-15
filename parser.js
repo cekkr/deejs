@@ -612,6 +612,7 @@ function Parser(bag, str, cbk){
                 if(p>=pos){
                     var pop = bag.parserPath.pop();
                     newArr.unshift(pop);
+                    p--
                 }
             }
 
@@ -801,6 +802,9 @@ function Parser(bag, str, cbk){
         console.log("confirm", instr);
         instr.confirm();
 
+        if(bag.disk != instr.getParentDisk())
+            parserPathPop(instr);
+
         //bag.parserPath.pop();
 
         /*if(instructionIsInsideBagDisk()){
@@ -908,7 +912,7 @@ function Parser(bag, str, cbk){
                 res = true;  
             }
 
-            if(!disk.Transparent && isDiskConfirmed(disk)){
+            if(isDiskConfirmed(disk)){
                 bag.disk = disk;  
             }
 
@@ -1538,43 +1542,42 @@ function Parser(bag, str, cbk){
 
             }*/
 
+            if(instr.name == "arguments")
+                console.log("debug");
+
+            ///
+            /// Algorithm: parserPath composer
+            ///
             var ppLength = bag.parserPath.length;
 
-            var i=instr;
-            while(i){
-                for(var p=ppLength-1; p >= 0; p--){
-                    //continua da qui
+            var i = instr;
+            var p = ppLength-1, winP;
+            for(; p >= 0; p--){
+                while(i){
+                    if(i == bag.parserPath[p][2]){
+                        winP = p;
+                        p=-1;
+
+                        while(getLastParserPath()[2]!=i)
+                            parserPathPop();
+
+                        break;
+                    }
+                    i = i.parent;
                 }
-
-                i = i.parent;
             }
-    
-            /*if(instr.getParentDisk() != disk)
-                console.log("debug: possible track");*/
 
-            /*while(instr.getParentDisk() != disk)
+            while(i != instr){
+                parserPathPush(instr, winP+1);
                 instr = instr.parent;
+            }
 
-            while(instr != curInstr && p < bag.parserPath.length){
-                if(!instr)
-                    break;
-
-                //console.log("pushing", instr);
-
-                if(!bag.parserPath[p])
-                    console.log("debug");
-
-                if(bag.parserPath[p][2] == instr)
-                    break;
-
-                parserPathPush(instr, p);
-                instr = instr.parent;
-            }*/
-
+            // Checking algorithm
+            selectInstruction();
             var instr = instruction;
             var p = bag.parserPath.length-1;
             while(instr){
-                if(instr != bag.parserPath[p][2])
+                if(!bag.parserPath[p] || instr != bag.parserPath[p][2])
                     console.log("ODDIO");
 
                 instr = instr.parent;
