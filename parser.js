@@ -832,13 +832,17 @@ function Parser(bag, str, cbk){
             if(typeof disk == 'string'){
 
                 if(true){
+
+                    if(disk == ".arguments")
+                        console.log("debug");
+
                     var dsk = disks;
                     var spl = disk.split('.');
                     for(var sp of spl){
                         if(sp)
                             dsk = dsk[sp];
                         else 
-                            dsk = curDisk;
+                            dsk = getLastParserPath()[1];
                     }
 
                     if(!dsk){
@@ -1217,6 +1221,9 @@ function Parser(bag, str, cbk){
 
                         if(validated){
                             bag.lastMatchString = matchMatch;
+
+                            if(matchMatch == "function")
+                                console.log("debug");
 
                             // it jumps to the end of the word
                             // in this sense, we are acceding in a importat keyword
