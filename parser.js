@@ -664,7 +664,10 @@ function Parser(bag, str, cbk){
         for(var paths of bag.parserPath){
             var path = paths[0];
             lastObj = paths[1];
-            if(paths[2]) lastInstr = paths[2];
+            if(paths[2]) {
+                lastInstr = paths[2];
+                lastInstr.endLine = [line, pos];
+            }
             if(tPath) tPath += ".";
             tPath += path;
             
@@ -827,41 +830,24 @@ function Parser(bag, str, cbk){
     function ensureObjectDisk(disk){
         if(disk){
             if(typeof disk == 'string'){
-                var diskName = disk;
-                if(disk[0]=='.' && lastDiskStr){
-                    if(!lastDiskStr.endsWith(disk))
-                        disk = lastDiskStr+disk;
-                    else 
-                        disk = lastDiskStr;
-                    
-                    diskName = disk;
-                }
 
-                try{
-                    disk = eval('disks.'+disk);
-                }
-                catch(err){
-                    console.log("debug");
-                }
-                
-
-                if(disk == undefined){
-                    //Search by parent
-                    disk = bag.disk;
-                    while(disk){
-                        if(disk[disk])
-                            break;
-                        disk = disk.parent;
+                if(true){
+                    var dsk = disks;
+                    var spl = disk.split('.');
+                    for(var sp of spl){
+                        if(sp)
+                            dsk = dsk[sp];
+                        else 
+                            dsk = curDisk;
                     }
-                }
 
-                if(!disk){
-                    console.log("disk ", 'disks.'+diskName, "not found!");
-                    process.exit(-1);
-                }
+                    if(!dsk){
+                        console.log("disk ", disk, "not found!");
+                        process.exit(-1);
+                    }
 
-                lastDiskStr = disk.fullName || disk;
-                return disk;
+                    return dsk;
+                }
             }
         }
 
@@ -953,7 +939,7 @@ function Parser(bag, str, cbk){
         //var glPP = getLastParserPath();
 
         //or better select it from parsePath?
-        var nxtDisk = curDisk._parent;//instruction.getParentDisk().disk;
+        var nxtDisk = instruction.parent.getParentDisk(); //curDisk._parent;//instruction.getParentDisk().disk;
 
         if(curDisk == nxtDisk){
             return false;
@@ -1040,6 +1026,27 @@ function Parser(bag, str, cbk){
             if(!res)
                 parserPathPop(disk);
         }
+
+        function executeDisk(disk){
+            var glPP = getLastParserPath();
+
+            changeDisk(disk);
+
+            var res = evaluateDisk(disk);
+
+            var nglPP = getLastParserPath();
+            if(glPP != nglPP){
+                if(res){
+                    confirmInstruction();
+                }
+                else {
+                    destroyInstruction();
+                }   
+            }
+
+            return res;
+        }
+        
 
         function checkMatch(match){
             //var instr = bag.instruction.getInstr();
@@ -1176,26 +1183,7 @@ function Parser(bag, str, cbk){
                 if(tmpDisk.name == "expression" && glPP[0] == 'inTag')
                     console.log("debug");
                 
-                /*var arr;
-                if(!tmpDisk.Transparent)
-                    arr = parserPathPush(tmpDisk);*/
-
-                changeDisk(tmpDisk);
-
-                var res = evaluateDisk(tmpDisk);
-
-                var nglPP = getLastParserPath();
-                if(glPP != nglPP){
-                    if(res){
-                        confirmInstruction();
-                    }
-                    else {
-                        destroyInstruction();
-                    }   
-                }
-
-                //parserPathPop(tmpDisk);
-                //exitDisk();
+                var res = executeDisk(tmpDisk);
 
                 return res;
             }
