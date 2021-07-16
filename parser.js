@@ -100,8 +100,9 @@ class Instruction{
     confirm(instr){
         if(instr){
             if(this.instructions.indexOf(instr)<0)
-            this.instructions.push(instr);
-            this.activeInstructions.push(instr);
+                this.instructions.push(instr);
+            if(this.activeInstructions.indexOf(instr)<0)
+                this.activeInstructions.push(instr);
             this.confirm();
         }
         else {
@@ -868,6 +869,21 @@ function Parser(bag, str, cbk){
     }
 
     ///
+    /// AlivePath
+    ///
+    function addToAlivePath(parserPath){
+        if(comingFromAlivePathNum>=0){
+            alivePath[comingFromAlivePathNum] = getLastParserPath();
+        }
+        else {
+            var glPP = getLastParserPath();
+            var io = alivePath.indexOf(glPP);
+            if(io<=0)
+                alivePath.push(glPP);
+        }
+    }
+
+    ///
     /// Change Disk
     ///
     function changeDisk(ret, getBack=false){
@@ -893,11 +909,7 @@ function Parser(bag, str, cbk){
 
                 if(!getBack){
                     parserPathPush(disk.name, disk);   
-
-                    if(comingFromAlivePathNum>=0)
-                        alivePath[comingFromAlivePathNum] = getLastParserPath();
-                    else 
-                        alivePath.push(getLastParserPath());
+                    addToAlivePath(getLastParserPath());
                 }
                 else {
                     while(getLastParserPath()[1] != disk)
@@ -1021,11 +1033,7 @@ function Parser(bag, str, cbk){
 
             if(bag.disk != disk) {
                 var last = getLastParserPath();
-                if(comingFromAlivePathNum>=0)
-                    alivePath[comingFromAlivePathNum] = last;
-                else
-                    alivePath.push(last);
-
+                addToAlivePath(last);
                 parserPathPop(last);
             }
             
@@ -1302,13 +1310,17 @@ function Parser(bag, str, cbk){
                 instr.completed = true;
                 var prec = exitDisk(disk);
 
-                if(lastPP[2] == instr){
+                if(comingFromAlivePathNum>=0){
+                    alivePath[comingFromAlivePathNum] = getLastParserPath();
+                }
+
+                /*if(lastPP[2] == instr){
                     //var ap = removeAlivePath(instr);
                     //parserPathPop();
                     if(comingFromAlivePathNum>=0){
                         alivePath[comingFromAlivePathNum] = getLastParserPath();
                     }
-                }
+                }*/
 
                 //return evaluateDisk(prec);
                 return false;
