@@ -890,7 +890,7 @@ function Parser(bag, str, cbk){
                 instr._disk = disk;*/
 
                 var glPP = getLastParserPath();
-                if(glPP && glPP[0]=='block' && disk.name == "inTag")
+                if(glPP && glPP[0]=='inTag' && disk.name == "function")
                     console.log("debug");
 
                 //var alivePos = alivePath.indexOf(glPP);
@@ -912,6 +912,11 @@ function Parser(bag, str, cbk){
                 
                 instruction.disk = disk;
                 res = true;  
+            }
+
+            if(bag.TempImportant){
+                instruction.Important = true;
+                bag.TempImportant = undefined;
             }
 
             if(isDiskConfirmed(disk)){
@@ -1005,7 +1010,8 @@ function Parser(bag, str, cbk){
         ///
         function updateMatchInstruction(disk){
             disk = ensureObjectDisk(disk);
-        
+            
+
             if(!disk){
                 console.log("debug null disk");
                 return;
@@ -1222,18 +1228,15 @@ function Parser(bag, str, cbk){
                         if(validated){
                             bag.lastMatchString = matchMatch;
 
-                            if(matchMatch == "function")
-                                console.log("debug");
-
                             // it jumps to the end of the word
                             // in this sense, we are acceding in a importat keyword
                             // and the next instruction should be considered as the base level
                             j += matchMatch.length-1;
 
                             if(match.action){
+                                bag.TempImportant = true;
                                 updateMatchInstruction(match.action(bag));
                                 //instr._curOrder++; ?
-                                instr.Important = true;
                             }
 
                             // Ex if match.type == 'exit'
@@ -1264,7 +1267,7 @@ function Parser(bag, str, cbk){
 
             curDisk = disk;
             
-            if(disk.name == "expression")
+            if(disk.name == "function")
                 console.log("debug");
 
             console.log("evaluating", disk.fullName);
@@ -1301,6 +1304,9 @@ function Parser(bag, str, cbk){
                     disk.OnExit();
 
                 var lastPP = getLastParserPath();
+
+                console.log("exiting from", lastPP[0]);
+                //todo: study what todo
 
                 instr.completed = true;
                 var prec = exitDisk(disk);
@@ -1465,6 +1471,9 @@ function Parser(bag, str, cbk){
 
                         }
                     }
+
+                    if(bag.disk != disk)
+                        return;
                 }
 
                 if(pos >= matches.length){
@@ -1491,6 +1500,9 @@ function Parser(bag, str, cbk){
                             destroyInstruction();
                         }        
                     }
+
+                    if(bag.disk != disk)
+                        return;
 
                     if(ret){
                         // Exit type is possible just with unordered disk
