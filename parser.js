@@ -213,7 +213,10 @@ const disks = {
                     MatchesOrder: true,
                     Matches: [
                         {
-                            match: ['/*']
+                            match: ['/*'],
+                            action: function(){
+                                return true;
+                            }
                         },
                         {
                             match: ['*/']
@@ -432,11 +435,15 @@ function initDisks(disk=undefined, name='', overAll=null){
                     if(!overAll) overAll = [];
                     for(var o in disk[p].OverAll){
                         var obj = disk[p].OverAll[o];
+                        disk[p][o] = disk[p].OverAll[o];
 
-                        if(typeof obj == "string")
+                        if(typeof obj == "string"){
                             overAll.push(obj);
-                        else 
+                            //obj.Transparent = true; //cazzata da rivalutare
+                        }
+                        else {
                             overAll.push(o);
+                        }
                     }
                 }
 
@@ -445,7 +452,8 @@ function initDisks(disk=undefined, name='', overAll=null){
                         disk[p].MatchesThrough = disk[p].MatchesThrough ? [disk[p].MatchesThrough] : [];
 
                         for(var o of overAll){
-                            disk[p].MatchesThrough.push(o);
+                            if(overAll.indexOf(disk[p].name)<0)
+                                disk[p].MatchesThrough.push(o);
                         }
                     }
                 }
@@ -521,6 +529,7 @@ function isDiskConfirmed(disk){
 }
 
 initDisks(disks);
+console.log("debug init disk");
 
 function Parser(bag, str, cbk){
     bag.httpBuffer = "";
@@ -968,6 +977,12 @@ function Parser(bag, str, cbk){
         //var glPP = getLastParserPath();
 
         //or better select it from parsePath?
+
+        if(!instruction.parent){
+            console.error("debug, instruction without parent");
+            return; //autocompleted
+        }
+
         var nxtDisk = instruction.parent.getParentDisk(); //curDisk._parent;//instruction.getParentDisk().disk;
 
         if(curDisk == nxtDisk){
@@ -1197,6 +1212,7 @@ function Parser(bag, str, cbk){
                 }
                 else {
                     //todo: error parser composition
+                    throw new Error("Disk not found");
                 }
             }
             
@@ -1205,6 +1221,7 @@ function Parser(bag, str, cbk){
             ///
             if(match._disk){
                 //var prevDisk = instr.disk;
+                var curDisk = bag.disk;
                 var tmpDisk = match._disk;
 
                 var glPP = getLastParserPath();
@@ -1214,6 +1231,9 @@ function Parser(bag, str, cbk){
                     console.log("debug");
                 
                 var res = executeDisk(tmpDisk);
+
+                if(objMatch && objMatch.temporary)
+                    bag.disk = curDisk;
 
                 return res;
             }
@@ -1373,8 +1393,14 @@ function Parser(bag, str, cbk){
                         disk.MatchesThrough = [disk.MatchesThrough];
 
                     for(var i in disk.MatchesThrough){
-                        if(checkMatch('"'+disk.MatchesThrough[i]))
+                        var through = disk.MatchesThrough[i];
+
+                        if(through == "comment")
+                            console.log("debug");
+
+                        if(checkMatch('"'+through)){
                             return true;
+                        }
                     }
                 }
 
@@ -1619,7 +1645,7 @@ function Parser(bag, str, cbk){
             var p = bag.parserPath.length-1;
             while(instr){
                 if(!bag.parserPath[p] || instr != bag.parserPath[p][2])
-                    console.log("ODDIO");
+                    console.log("ODDIO"); // perchè ODDIO >:(
 
                 instr = instr.parent;
                 p--;
@@ -1690,9 +1716,6 @@ function Parser(bag, str, cbk){
             console.log("debug");
 
         evaluateDisk();
-
-        if(bag.disk.name == "whitespace")
-            console.log("debug");
 
     }
 
