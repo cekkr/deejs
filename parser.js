@@ -168,248 +168,251 @@ var instruction;
 /// Disks
 ///
 const disks = {
-    root: [
-        {
-            match: '<?',
-            action: function(){
-                return 'inTag';
-            }
-        },
-        {
-            match: function(ch, bag){
-                instruction.content += ch;
-            }
-        }
-    ],
-    inTag:{ 
-        Important: true,
-        MatchesThrough: ['whitespace', 'separator'],
-        Matches: [
+    root: {
+        Matches:[
             {
-                match: '?>',
+                match: '<?',
                 action: function(){
-                    return 'root';
-                }
-            }, 
-            {
-                match: 'async',
-                action: function(bag){
-                    bag.args.push('async');
-                }
-            }, 
-            {
-                match: 'function',
-                action: function(){
-                    return 'inTag.function';
+                    return '.inTag';
                 }
             },
-            'expression'   
+            {
+                match: function(ch, bag){
+                    instruction.content += ch;
+                }
+            }
         ],
-        OverAll: {
-            comment: {
-                Important: true,
-                MatchesOrder: true,
-                Matches: [
-                    {
-                        match: ['/*']
-                    },
-                    {
-                        match: ['*/']
-                    }
-                ]
-            },
-            commentInline: {
-                Important: true,
-                MatchesOrder: true,
-                Matches: [
-                    {
-                        match: ['//']
-                    },
-                    {
-                        match: ['\n']
-                    }
-                ]
-            }
-        },
-        whitespace: {
-            Transparent: true,
-            Matches: function(ch){
-                return isWhitespace(ch) || ch=='\n' || ch =='\r';
-            }
-        },
-        separator: {
-            Transparent: true,
-            Matches: function(ch){
-                return ch == ';';
-            }
-        },
-        expression: {
-            MatchesOrder: true,
-            Matches: [
-                'varDeclaration',
-                'whitespace',
-                {
-                    type: 'mandatory',
-                    match: function(ch){
-                        var instr = instruction;
 
-                        var isIt = isAlpha(ch);
-                        if(isIt)
-                            instr.content += ch;
-
-                        return isIt;
-                    }
-                },
-                '(IF varDeclaration ? ELSE !)operator'
-            ],
-            varDeclaration: {
-                Matches: [
-                    {
-                        match: ['var', 'let', 'const'],
-                        action: function(bag){
-                            var instr = instruction;
-                            //instr = instr.insert('declaration');
-                            instr.type = bag.lastMatchString;
-                        }
-                    }
-                ]
-            },
-            operator: {
-                Matches: [
-                    {
-                        match: ['==', '=']
-                    }
-                ]
-            }
-        },
-        value: {
-            number: {
-                Matches: [
-                    {
-                        match: function(ch, bag){
-                            return isNumeric(ch);
-                        }
-                    }
-                ]
-            },
-            string: {
-                MatchesOrder: true,
-                Matches: [
-                    {
-                        match: function(ch, bag){
-
-                        }
-                    }
-                ]
-            }
-        },
-        block: {
-            //MustCalled: true, //?
-            MatchesOrder: true,
-            MatchesThrough: 'whitespace',
+        inTag:{ 
+            Important: true,
+            MatchesThrough: ['whitespace', 'separator'],
             Matches: [
                 {
-                    type: 'mandatory',
-                    match: '{',
+                    match: '?>',
                     action: function(){
-                        console.log("debug block");
-                    }
-                },
-                '!inTag',
-                {
-                    type: 'mandatory',
-                    match: '}',
-                }
-            ]
-        },
-        function: {
-            MatchesOrder: true,
-            MatchesThrough: 'whitespace',
-            Matches: [
-                {
-                    type: 'optional',
-                    match: function(ch, bag){
-                        if(isAlpha(ch)){
-                            var instr = instruction;
-                            instr.check("functionName");
-                            instr.functionName += ch;
-
-                            return true;
-                        }
-
-                        return false;
+                        return 'root';
                     }
                 }, 
                 {
-                    type: 'mandatory',
-                    match: '(',
+                    match: 'async',
+                    action: function(bag){
+                        bag.args.push('async');
+                    }
+                }, 
+                {
+                    match: 'function',
                     action: function(){
-                        return '.arguments'
+                        return 'inTag.function';
                     }
                 },
-                '!block'
+                'expression'   
             ],
-            arguments: {
-                OnStart: function(bag){
-                    bag._argNum = 0;
+            OverAll: {
+                comment: {
+                    Important: true,
+                    MatchesOrder: true,
+                    Matches: [
+                        {
+                            match: ['/*']
+                        },
+                        {
+                            match: ['*/']
+                        }
+                    ]
                 },
-                OnExit: function(bag){
-                    //debug purposes
-                    console.log("argument exit");
+                commentInline: {
+                    Important: true,
+                    MatchesOrder: true,
+                    Matches: [
+                        {
+                            match: ['//']
+                        },
+                        {
+                            match: ['\n']
+                        }
+                    ]
+                }
+            },
+            whitespace: {
+                Transparent: true,
+                Matches: function(ch){
+                    return isWhitespace(ch) || ch=='\n' || ch =='\r';
+                }
+            },
+            separator: {
+                Transparent: true,
+                Matches: function(ch){
+                    return ch == ';';
+                }
+            },
+            expression: {
+                MatchesOrder: true,
+                Matches: [
+                    'varDeclaration',
+                    'whitespace',
+                    {
+                        type: 'mandatory',
+                        match: function(ch){
+                            var instr = instruction;
+    
+                            var isIt = isAlpha(ch);
+                            if(isIt)
+                                instr.content += ch;
+    
+                            return isIt;
+                        }
+                    },
+                    '(IF varDeclaration ? ELSE !)operator'
+                ],
+                varDeclaration: {
+                    Matches: [
+                        {
+                            match: ['var', 'let', 'const'],
+                            action: function(bag){
+                                var instr = instruction;
+                                //instr = instr.insert('declaration');
+                                instr.type = bag.lastMatchString;
+                            }
+                        }
+                    ]
                 },
+                operator: {
+                    Matches: [
+                        {
+                            match: ['==', '=']
+                        }
+                    ]
+                }
+            },
+            value: {
+                number: {
+                    Matches: [
+                        {
+                            match: function(ch, bag){
+                                return isNumeric(ch);
+                            }
+                        }
+                    ]
+                },
+                string: {
+                    MatchesOrder: true,
+                    Matches: [
+                        {
+                            match: function(ch, bag){
+    
+                            }
+                        }
+                    ]
+                }
+            },
+            block: {
+                //MustCalled: true, //?
                 MatchesOrder: true,
                 MatchesThrough: 'whitespace',
                 Matches: [
                     {
                         type: 'mandatory',
-                        match: function(ch, bag){
-                            var instr = instruction;//bag.instruction.getInstr();
-
-                            if(isAlpha(ch)){    
-                                if(!instr._curArg) 
-                                    instr._curArg = instr.newChild("argument", false);
-
-                                //bag._curChild = instr;
-                                instr._curArg.check("argName");
-                                instr._curArg.argName += ch;                                
-
-                                return true;
-                            }
-
-                            if(instr.name == "argument") 
-                                instr.close();
-
-                            return false;
-                        },
-                        onClose: function(bag){
-                            var instr = bag.instruction.getInstr();
-                            instr._curArg = undefined;
+                        match: '{',
+                        action: function(){
+                            console.log("debug block");
                         }
                     },
+                    '!inTag',
+                    {
+                        type: 'mandatory',
+                        match: '}',
+                    }
+                ]
+            },
+            function: {
+                MatchesOrder: true,
+                MatchesThrough: 'whitespace',
+                Matches: [
                     {
                         type: 'optional',
-                        match: '=',
+                        match: function(ch, bag){
+                            if(isAlpha(ch)){
+                                var instr = instruction;
+                                instr.check("functionName");
+                                instr.functionName += ch;
+    
+                                return true;
+                            }
+    
+                            return false;
+                        }
+                    }, 
+                    {
+                        type: 'mandatory',
+                        match: '(',
                         action: function(){
-                            return '.assign';
+                            return '.arguments'
                         }
                     },
-                    {
-                        type: 'repeat',
-                        match: ',',
-                        action: function(bag){
-                            /*var instr = bag.instruction.getInstr();
-                            instr = instr.parent.newChild("argument");*/
-                        }
-                    },
-                    {
-                        type: 'exit',
-                        match: ')'
-                    }
+                    '!block'
                 ],
-                assign: {
-                    Matches:[
-                        'value'
-                    ]
+                arguments: {
+                    OnStart: function(bag){
+                        bag._argNum = 0;
+                    },
+                    OnExit: function(bag){
+                        //debug purposes
+                        console.log("argument exit");
+                    },
+                    MatchesOrder: true,
+                    MatchesThrough: 'whitespace',
+                    Matches: [
+                        {
+                            type: 'mandatory',
+                            match: function(ch, bag){
+                                var instr = instruction;//bag.instruction.getInstr();
+    
+                                if(isAlpha(ch)){    
+                                    if(!instr._curArg) 
+                                        instr._curArg = instr.newChild("argument", false);
+    
+                                    //bag._curChild = instr;
+                                    instr._curArg.check("argName");
+                                    instr._curArg.argName += ch;                                
+    
+                                    return true;
+                                }
+    
+                                if(instr.name == "argument") 
+                                    instr.close();
+    
+                                return false;
+                            },
+                            onClose: function(bag){
+                                var instr = bag.instruction.getInstr();
+                                instr._curArg = undefined;
+                            }
+                        },
+                        {
+                            type: 'optional',
+                            match: '=',
+                            action: function(){
+                                return '.assign';
+                            }
+                        },
+                        {
+                            type: 'repeat',
+                            match: ',',
+                            action: function(bag){
+                                /*var instr = bag.instruction.getInstr();
+                                instr = instr.parent.newChild("argument");*/
+                            }
+                        },
+                        {
+                            type: 'exit',
+                            match: ')'
+                        }
+                    ],
+                    assign: {
+                        Matches:[
+                            'value'
+                        ]
+                    }
                 }
             }
         }
@@ -763,14 +766,23 @@ function Parser(bag, str, cbk){
         if(!instr) 
             instr = instruction;
 
+        if(instr.name == "expression")
+            console.log("debug");
+
         if(!instr)
             return;
 
         instr.deconfirm()
 
         instruction = instr.parent;
-        if(instruction)
+        if(instruction){
+            // Remove yourself from parent's pathInstructions
             delete instr.pathInstructions[instr.name];
+
+            // Remove yourself from parent instructions (if exists)
+            var p = instruction.instructions.indexOf(instr);
+            if(p>=0) instruction.instructions.splice(p, 1);
+        }
 
         //todo: remove from alivePaths
         var pos = alivePathGetPos(instr);
@@ -839,10 +851,18 @@ function Parser(bag, str, cbk){
                     var dsk = disks;
                     var spl = disk.split('.');
                     for(var sp of spl){
-                        if(sp)
+                        if(sp){
                             dsk = dsk[sp];
-                        else 
+                             if(!dsk){
+                                 for(var pp of bag.parserPath){
+                                     if(pp[0]==sp)
+                                        dsk = pp[1];
+                                 }
+                             }
+                        }
+                        else {
                             dsk = getLastParserPath()[1];
+                        }
                     }
 
                     if(!dsk){
@@ -1270,7 +1290,8 @@ function Parser(bag, str, cbk){
             if(disk.name == "function")
                 console.log("debug");
 
-            console.log("evaluating", disk.fullName);
+            if(!disk.Transparent)
+                console.log("evaluating", disk.fullName);
             if(!instruction)
                 console.log("debug");
             console.log("instruction", instruction.path);
@@ -1527,7 +1548,8 @@ function Parser(bag, str, cbk){
                     }
                 }
 
-                for(var del of toDelete){
+                for(var d in toDelete){
+                    var del = toDelete[d];
                     instruction.activeInstructions.splice(del,1);
                 }
             }
@@ -1664,8 +1686,13 @@ function Parser(bag, str, cbk){
         ///
         /// Evaluate current disk (looking for new ways)
         ///
+        if(bag.disk.name == "function")
+            console.log("debug");
+
         evaluateDisk();
 
+        if(bag.disk.name == "whitespace")
+            console.log("debug");
 
     }
 
