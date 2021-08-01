@@ -173,7 +173,7 @@ const disks = {
             {
                 match: '<?',
                 action: function(){
-                    return '.inTag';
+                    return 'inTag';
                 }
             },
             {
@@ -181,241 +181,240 @@ const disks = {
                     instruction.content += ch;
                 }
             }
+        ]
+    },
+    inTag:{ 
+        Important: true,
+        MatchesThrough: ['whitespace', 'separator'],
+        Matches: [
+            {
+                match: '?>',
+                action: function(){
+                    return 'root';
+                }
+            }, 
+            {
+                match: 'async',
+                action: function(bag){
+                    bag.args.push('async');
+                }
+            }, 
+            {
+                match: 'function',
+                action: function(){
+                    return 'inTag.function';
+                }
+            },
+            'expression'   
         ],
-
-        inTag:{ 
-            Important: true,
-            MatchesThrough: ['whitespace', 'separator'],
-            Matches: [
-                {
-                    match: '?>',
-                    action: function(){
-                        return 'root';
-                    }
-                }, 
-                {
-                    match: 'async',
-                    action: function(bag){
-                        bag.args.push('async');
-                    }
-                }, 
-                {
-                    match: 'function',
-                    action: function(){
-                        return 'inTag.function';
-                    }
-                },
-                'expression'   
-            ],
-            OverAll: {
-                comment: {
-                    Important: true,
-                    MatchesOrder: true,
-                    Matches: [
-                        {
-                            match: ['/*'],
-                            action: function(){
-                                return true;
-                            }
-                        },
-                        {
-                            match: ['*/']
-                        }
-                    ]
-                },
-                commentInline: {
-                    Important: true,
-                    MatchesOrder: true,
-                    Matches: [
-                        {
-                            match: ['//']
-                        },
-                        {
-                            match: ['\n']
-                        }
-                    ]
-                }
-            },
-            whitespace: {
-                Transparent: true,
-                Matches: function(ch){
-                    return isWhitespace(ch) || ch=='\n' || ch =='\r';
-                }
-            },
-            separator: {
-                Transparent: true,
-                Matches: function(ch){
-                    return ch == ';';
-                }
-            },
-            expression: {
+        OverAll: {
+            comment: {
+                Important: true,
                 MatchesOrder: true,
                 Matches: [
-                    'varDeclaration',
-                    'whitespace',
                     {
-                        type: 'mandatory',
-                        match: function(ch){
-                            var instr = instruction;
-    
-                            var isIt = isAlpha(ch);
-                            if(isIt)
-                                instr.content += ch;
-    
-                            return isIt;
-                        }
-                    },
-                    '(IF varDeclaration ? ELSE !)operator'
-                ],
-                varDeclaration: {
-                    Matches: [
-                        {
-                            match: ['var', 'let', 'const'],
-                            action: function(bag){
-                                var instr = instruction;
-                                //instr = instr.insert('declaration');
-                                instr.type = bag.lastMatchString;
-                            }
-                        }
-                    ]
-                },
-                operator: {
-                    Matches: [
-                        {
-                            match: ['==', '=']
-                        }
-                    ]
-                }
-            },
-            value: {
-                number: {
-                    Matches: [
-                        {
-                            match: function(ch, bag){
-                                return isNumeric(ch);
-                            }
-                        }
-                    ]
-                },
-                string: {
-                    MatchesOrder: true,
-                    Matches: [
-                        {
-                            match: function(ch, bag){
-    
-                            }
-                        }
-                    ]
-                }
-            },
-            block: {
-                //MustCalled: true, //?
-                MatchesOrder: true,
-                MatchesThrough: 'whitespace',
-                Matches: [
-                    {
-                        type: 'mandatory',
-                        match: '{',
+                        match: ['/*'],
                         action: function(){
-                            console.log("debug block");
+                            return true;
                         }
                     },
-                    '!inTag',
                     {
-                        type: 'mandatory',
-                        match: '}',
+                        match: ['*/']
                     }
                 ]
             },
-            function: {
+            commentInline: {
+                Important: true,
+                MatchesOrder: true,
+                Matches: [
+                    {
+                        match: ['//']
+                    },
+                    {
+                        match: ['\n']
+                    }
+                ]
+            }
+        },
+        whitespace: {
+            Transparent: true,
+            Matches: function(ch){
+                return isWhitespace(ch) || ch=='\n' || ch =='\r';
+            }
+        },
+        separator: {
+            Transparent: true,
+            Matches: function(ch){
+                return ch == ';';
+            }
+        },
+        expression: {
+            MatchesOrder: true,
+            Matches: [
+                'varDeclaration',
+                'whitespace',
+                {
+                    type: 'mandatory',
+                    match: function(ch){
+                        var instr = instruction;
+
+                        var isIt = isAlpha(ch);
+                        if(isIt)
+                            instr.content += ch;
+
+                        return isIt;
+                    }
+                },
+                '(IF varDeclaration ? ELSE !)operator'
+            ],
+            varDeclaration: {
+                Matches: [
+                    {
+                        match: ['var', 'let', 'const'],
+                        action: function(bag){
+                            var instr = instruction;
+                            //instr = instr.insert('declaration');
+                            instr.type = bag.lastMatchString;
+                        }
+                    }
+                ]
+            },
+            operator: {
+                Matches: [
+                    {
+                        match: ['==', '=']
+                    }
+                ]
+            }
+        },
+        value: {
+            number: {
+                Matches: [
+                    {
+                        match: function(ch, bag){
+                            return isNumeric(ch);
+                        }
+                    }
+                ]
+            },
+            string: {
+                MatchesOrder: true,
+                Matches: [
+                    {
+                        match: function(ch, bag){
+
+                        }
+                    }
+                ]
+            }
+        },
+        block: {
+            //MustCalled: true, //?
+            MatchesOrder: true,
+            MatchesThrough: 'whitespace',
+            Matches: [
+                {
+                    type: 'mandatory',
+                    match: '{',
+                    action: function(){
+                        console.log("debug block");
+                    }
+                },
+                '!inTag',
+                {
+                    type: 'mandatory',
+                    match: '}',
+                }
+            ]
+        },
+        function: {
+            MatchesOrder: true,
+            MatchesThrough: 'whitespace',
+            Matches: [
+                {
+                    type: 'optional',
+                    match: function(ch, bag){
+                        if(isAlpha(ch)){
+                            var instr = instruction;
+                            instr.check("functionName");
+                            instr.functionName += ch;
+
+                            return true;
+                        }
+
+                        return false;
+                    }
+                }, 
+                {
+                    type: 'mandatory',
+                    match: '(',
+                    action: function(){
+                        return '.arguments'
+                    }
+                },
+                '!block'
+            ],
+            arguments: {
+                OnStart: function(bag){
+                    bag._argNum = 0;
+                },
+                OnExit: function(bag){
+                    //debug purposes
+                    console.log("argument exit");
+                },
                 MatchesOrder: true,
                 MatchesThrough: 'whitespace',
                 Matches: [
                     {
-                        type: 'optional',
+                        type: 'mandatory',
                         match: function(ch, bag){
-                            if(isAlpha(ch)){
-                                var instr = instruction;
-                                instr.check("functionName");
-                                instr.functionName += ch;
-    
+                            var instr = instruction;//bag.instruction.getInstr();
+
+                            if(isAlpha(ch)){    
+                                if(!instr._curArg) 
+                                    instr._curArg = instr.newChild("argument", false);
+
+                                //bag._curChild = instr;
+                                instr._curArg.check("argName");
+                                instr._curArg.argName += ch;                                
+
                                 return true;
                             }
-    
+
+                            if(instr.name == "argument") 
+                                instr.close();
+
                             return false;
+                        },
+                        onClose: function(bag){
+                            var instr = bag.instruction.getInstr();
+                            instr._curArg = undefined;
                         }
-                    }, 
+                    },
                     {
-                        type: 'mandatory',
-                        match: '(',
+                        type: 'optional',
+                        match: '=',
                         action: function(){
-                            return '.arguments'
+                            return '.assign';
                         }
                     },
-                    '!block'
-                ],
-                arguments: {
-                    OnStart: function(bag){
-                        bag._argNum = 0;
-                    },
-                    OnExit: function(bag){
-                        //debug purposes
-                        console.log("argument exit");
-                    },
-                    MatchesOrder: true,
-                    MatchesThrough: 'whitespace',
-                    Matches: [
-                        {
-                            type: 'mandatory',
-                            match: function(ch, bag){
-                                var instr = instruction;//bag.instruction.getInstr();
-    
-                                if(isAlpha(ch)){    
-                                    if(!instr._curArg) 
-                                        instr._curArg = instr.newChild("argument", false);
-    
-                                    //bag._curChild = instr;
-                                    instr._curArg.check("argName");
-                                    instr._curArg.argName += ch;                                
-    
-                                    return true;
-                                }
-    
-                                if(instr.name == "argument") 
-                                    instr.close();
-    
-                                return false;
-                            },
-                            onClose: function(bag){
-                                var instr = bag.instruction.getInstr();
-                                instr._curArg = undefined;
-                            }
-                        },
-                        {
-                            type: 'optional',
-                            match: '=',
-                            action: function(){
-                                return '.assign';
-                            }
-                        },
-                        {
-                            type: 'repeat',
-                            match: ',',
-                            action: function(bag){
-                                /*var instr = bag.instruction.getInstr();
-                                instr = instr.parent.newChild("argument");*/
-                            }
-                        },
-                        {
-                            type: 'exit',
-                            match: ')'
+                    {
+                        type: 'repeat',
+                        match: ',',
+                        action: function(bag){
+                            /*var instr = bag.instruction.getInstr();
+                            instr = instr.parent.newChild("argument");*/
                         }
-                    ],
-                    assign: {
-                        Matches:[
-                            'value'
-                        ]
+                    },
+                    {
+                        type: 'exit',
+                        match: ')'
                     }
+                ],
+                assign: {
+                    Matches:[
+                        'value'
+                    ]
                 }
             }
         }
@@ -611,7 +610,11 @@ function Parser(bag, str, cbk){
 
         var glPP = getLastParserPath();
         if(glPP && (glPP[1]==what || glPP[2] == what)) 
-            return false;
+            return false; //is repeatition
+
+        if(glPP && glPP[1]._parent == what._parent){
+            parserPathPop(glPP);
+        }
 
         var arr = [name, what];
 
@@ -775,6 +778,11 @@ function Parser(bag, str, cbk){
         if(!instr) 
             instr = instruction;
 
+        if(!instr){
+            console.log("debug");
+            return;
+        }
+
         if(instr.name == "expression")
             console.log("debug");
 
@@ -793,10 +801,13 @@ function Parser(bag, str, cbk){
             if(p>=0) instruction.instructions.splice(p, 1);
         }
 
+        if(!instruction)
+            console.log("debug");
+
         //todo: remove from alivePaths
         var pos = alivePathGetPos(instr);
         if(pos >= 0) 
-            removeAlivePath(pos);
+            removeAlivePath(pos); // ha-ha! il colpevole!
 
         parserPathPop(instr);
 
@@ -1022,6 +1033,7 @@ function Parser(bag, str, cbk){
 
     bag.instruction.name = "base";
     bag.instruction.obj = disks;
+    bag.disk = disks;
     parserPathPush(bag.instruction);
     changeDisk('root');
     instruction.confirm();
@@ -1092,6 +1104,28 @@ function Parser(bag, str, cbk){
             return res;
         }
         
+        function searchDiskIn(disk, what, past=null){
+            if(!past) past = [];
+            past.push(disk);
+
+            if(typeof disk != 'object')
+                return false;
+
+            for(var v in disk){
+                if(what == v)
+                    return disk[v];
+                
+                if(past.indexOf(disk[v])<0){
+                    var res = searchDiskIn(disk[v], what, past);
+                    if(res)
+                        return res;
+                }
+            }
+
+            past.pop();
+
+            return false;
+        }
 
         function checkMatch(match){
             //var instr = bag.instruction.getInstr();
@@ -1199,9 +1233,16 @@ function Parser(bag, str, cbk){
             }
 
             if(!match._disk && match.RefMatch){
-                var disk = instr.disk;
+                var disk = instr.disk || instr.obj;
+
+                // Check back
                 while(disk && !disk[match.RefMatch]){
                     disk = disk._parent;
+                }
+
+                // Check forward
+                if(!disk){
+                    disk = searchDiskIn(instr.disk || instr.obj, match.RefMatch);
                 }
 
                 if(disk && disk[match.RefMatch])
@@ -1654,6 +1695,9 @@ function Parser(bag, str, cbk){
             // Select disk
             changeDisk(disk);
             if(instruction.isMatch){
+                console.error("Instruction is match ???");
+                process.exit(-1);
+
                 //console.log('debug: instruction isMatch');
                 parserPathPush(instruction);
                 console.log("!!!INSTRUCTION IS MATCH!!!")
@@ -1715,7 +1759,8 @@ function Parser(bag, str, cbk){
         if(bag.disk.name == "function")
             console.log("debug");
 
-        evaluateDisk();
+        if(instruction)
+            evaluateDisk();
 
     }
 
