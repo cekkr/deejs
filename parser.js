@@ -907,8 +907,8 @@ function Parser(bag, str, cbk){
         }
         else {
             var glPP = getLastParserPath();
-            var io = alivePath.indexOf(glPP);
-            if(io<=0)
+            var io = alivePathGetPos(glPP);
+            if(io<0)
                 alivePath.push(glPP);
         }
     }
@@ -938,8 +938,10 @@ function Parser(bag, str, cbk){
                 //if(glPP[2].parent) glPP[2].parent.instructions.push(glPP[2]);
 
                 if(!getBack){
-                    parserPathPush(disk.name, disk);   
-                    addToAlivePath(getLastParserPath());
+                    parserPathPush(disk.name, disk);  
+                    curPP = getLastParserPath(); 
+                    if(curPP[2].isToComplete())
+                        addToAlivePath(curPP);
                 }
                 else {
                     while(getLastParserPath()[1] != disk)
@@ -1085,6 +1087,7 @@ function Parser(bag, str, cbk){
         }
 
         function executeDisk(disk){
+            var curDisk = bag.disk;
             var glPP = getLastParserPath();
 
             changeDisk(disk);
@@ -1092,7 +1095,7 @@ function Parser(bag, str, cbk){
             var res = evaluateDisk(disk);
 
             var nglPP = getLastParserPath();
-            if(glPP != nglPP){
+            if(glPP != nglPP && nglPP[1] == disk){
                 if(res){
                     confirmInstruction();
                 }
@@ -1100,6 +1103,10 @@ function Parser(bag, str, cbk){
                     destroyInstruction();
                 }   
             }
+            else 
+                console.log("debug");
+
+            changeDisk(curDisk);
 
             return res;
         }
@@ -1356,6 +1363,9 @@ function Parser(bag, str, cbk){
             if(!instruction)
                 console.log("debug");
             console.log("instruction", instruction.path);
+
+            if(disk.fullName == "inTag.expression.varDeclaration")
+                console.log("debug");
 
             var matches = disk;
 
