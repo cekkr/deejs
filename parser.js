@@ -500,6 +500,9 @@ function diskHasDisk(disk, child){
 }
 
 function isDiskConfirmed(disk){
+    if(!disk || !instruction)
+        return false;
+
     if(disk.Important || instruction.Important)
         return true;
 
@@ -666,6 +669,13 @@ function Parser(bag, str, cbk){
     }
 
     ///
+    /// Instruction fault
+    ///
+    function instructionFault(from){
+        console.log("debug");
+    }
+
+    ///
     /// Select instruction
     ///
     var alivePath = []; //(?)
@@ -744,8 +754,12 @@ function Parser(bag, str, cbk){
             //console.log("todo");
         }*/
         
-        if(cInst)
+        if(cInst){
+            var exInst = instruction;
             instruction = cInst;
+            if(!instruction)  
+                instructionFault(exInst);
+        }
     }
 
     ///
@@ -791,7 +805,10 @@ function Parser(bag, str, cbk){
 
         instr.deconfirm()
 
+        var exInst = instruction;
         instruction = instr.parent;
+        if(!instruction)  
+            instructionFault(exInst, instr);
         if(instruction){
             // Remove yourself from parent's pathInstructions
             delete instr.pathInstructions[instr.name];
@@ -802,7 +819,7 @@ function Parser(bag, str, cbk){
         }
 
         if(!instruction)
-            console.log("debug");
+            instructionFault();
 
         //todo: remove from alivePaths
         var pos = alivePathGetPos(instr);
@@ -1015,7 +1032,10 @@ function Parser(bag, str, cbk){
             if(!curPath)
                 return false;
 
+            var exInstr = instruction;
             instruction = curPath[2];
+            if(!instruction)  
+                instructionFault(exInstr);
             nxtDisk = instruction.getParentDisk();
 
             if(comingFromAlivePathNum>=0)
@@ -1364,7 +1384,7 @@ function Parser(bag, str, cbk){
                 console.log("debug");
             console.log("instruction", instruction.path);
 
-            if(disk.fullName == "inTag.expression.varDeclaration")
+            if(disk.fullName == "inTag")
                 console.log("debug");
 
             var matches = disk;
@@ -1420,6 +1440,25 @@ function Parser(bag, str, cbk){
             }
 
             ///
+            /// Check MatchesThrough
+            ///
+            if(disk.MatchesThrough){
+                if(!Array.isArray(disk.MatchesThrough))
+                    disk.MatchesThrough = [disk.MatchesThrough];
+
+                for(var i in disk.MatchesThrough){
+                    var through = disk.MatchesThrough[i];
+
+                    if(through == "comment")
+                        console.log("debug");
+
+                    if(checkMatch('"'+through)){
+                        return true;
+                    }
+                }
+            }
+
+            ///
             /// Disks match (theoretical)
             ///
             if(matches == undefined){
@@ -1437,23 +1476,6 @@ function Parser(bag, str, cbk){
 
                 //todo: guarda perchè non accetta whitespace in function
                 //if(instr.name == "function" && ch==' ') console.log("debug");
-
-                // Check through
-                if(disk.MatchesThrough){
-                    if(!Array.isArray(disk.MatchesThrough))
-                        disk.MatchesThrough = [disk.MatchesThrough];
-
-                    for(var i in disk.MatchesThrough){
-                        var through = disk.MatchesThrough[i];
-
-                        if(through == "comment")
-                            console.log("debug");
-
-                        if(checkMatch('"'+through)){
-                            return true;
-                        }
-                    }
-                }
 
                 //if(ch == '{') console.log('debug');
 
@@ -1640,7 +1662,9 @@ function Parser(bag, str, cbk){
         function forkToInstruction(instr){
             var baseInstr = instruction;// bag.instruction;
             instruction = instr;
-    
+            if(!instruction)  
+                instructionFault(baseInstr);
+
             var disk = instruction.getParentDisk();
     
             var path = instr.getPath();
@@ -1736,7 +1760,10 @@ function Parser(bag, str, cbk){
 
                 // Turn back
                 bag.parserPath = scurParserPath;  
-                instruction = scurInstr;    
+                var exInstr = instruction;
+                instruction = scurInstr;  
+                if(!instruction)  
+                    instructionFault(exInstr);
                 bag.disk = scurDisk;
             }
             else {
